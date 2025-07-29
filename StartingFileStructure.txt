@@ -1,0 +1,24 @@
+MyApp.sprout/
+│
+├── main.sprout          🌱 Entry point – your app's "seed"
+├── screens/             🖥️  Leaves of your app – each screen a new branch
+│   ├── Home.sprout
+│   └── AddItem.sprout
+│
+├── components/          🌿 Reusable "buds" – UI elements that bloom
+│   └── Button.sprout
+│
+├── lib/                 🪴 Shared logic – your app's roots
+│   └── utils.sprout
+│
+├── assets/              🎨 Photos, icons, sounds – the "soil" that feeds your app
+│   ├── icons/
+│   └── audio/
+│
+├── data/                💧 Water your app with data
+│   └── items.json
+│
+├── config.sprout        ⚙️  App name, version, permissions, theme – the "sunlight"
+│
+└── build/               🏗️  (Auto) Your app, fully grown and ready to plant
+    └── MyApp.apk / MyApp.ipa

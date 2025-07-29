@@ -1,0 +1,288 @@
+       🌱
+   SproutScript
+  Syntax Guide
+
+  For Sprout v1.0
+  growwithsprout.com
+
+  "Your idea is a seed. Let it grow."
+
+Designed for **quick learning**, **easy recall**, and **joyful use** — whether you're building a to-do list or a habit tracker in 5 minutes.
+
+---
+
+# 🌿 **SproutScript Syntax Cheat Sheet**
+
+> *“Write apps the way you think.”*
+
+---
+
+## 📦 1. **App Definition**
+Every project starts with an `app` block.
+
+```sprout
+app "My Notes" {
+  icon = "assets/icon.png"
+  theme = Light  // or Dark
+  start = Home   // first screen
+}
+```
+
+> 💡 No `main()`, no boilerplate. Just intent.
+
+---
+
+## 🖥️ 2. **Screens**
+Define user interfaces.
+
+```sprout
+screen Home {
+  ui {
+    column {
+      title("Welcome!")
+      label("You have 3 notes")
+      button("View Notes") -> NotesList
+    }
+  }
+}
+```
+
+- `->` means "navigate to"
+- `column` = vertical layout
+- `row` = horizontal layout
+
+---
+
+## 💡 3. **State & Variables**
+Store data that changes.
+
+```sprout
+state count = 0
+state name = "Alex"
+state todos = ["Buy milk", "Walk dog"]
+```
+
+- `state` is reactive — when it changes, UI updates automatically.
+- No manual `setState()` or hooks.
+
+---
+
+## ⚡ 4. **Actions & Logic**
+Respond to user input.
+
+```sprout
+button("Add") {
+  count = count + 1
+  alert("Count is now ${count}")
+}
+```
+
+- Code inside `{ }` runs when tapped.
+- Use `alert()`, `vibrate()`, `notify()`, etc.
+
+---
+
+## 📋 5. **Lists & Loops**
+Show dynamic content.
+
+```sprout
+list(todos) {
+  button("Done") {
+    todos.remove(item)
+  }
+}
+```
+
+- `item` is automatic — no need to declare it.
+- Supports `foreach item in todos { ... }` for complex cases.
+
+---
+
+## 🔄 6. **Navigation**
+Move between screens.
+
+```sprout
+button("Next") -> DetailScreen
+
+button("Edit") -> EditScreen("Bread", 2)
+```
+
+- Pass data directly as arguments.
+- Go back: `button("Back") -> Back`
+
+---
+
+## 🧩 7. **Reusable Components**
+Create custom UI pieces.
+
+```sprout
+component BigButton(text, color = blue) {
+  touchable(padding: 16, cornerRadius: 12) {
+    label(text, size: 18, color: color, bold)
+  } onTap
+}
+```
+
+Use it:
+```sprout
+BigButton("Save", red) {
+  saveData()
+}
+```
+
+---
+
+## 🔌 8. **Side Effects & Lifecycle**
+
+```sprout
+onLaunch {
+  todos = load("data/todos.json")
+  notify("Ready to go!") at 9:00AM
+}
+
+onExit {
+  save("data/todos.json", todos)
+}
+```
+
+- `onLaunch` → when screen appears
+- `onExit` → when leaving
+- `at`, `every`, `after` for scheduling
+
+---
+
+## 📁 9. **Data & Storage**
+
+```sprout
+load("data/notes.json")        // returns data
+save("data/notes.json", items) // saves list or object
+```
+
+- Auto-creates file if missing.
+- Supports `.json`, `.csv`, `.txt`
+
+---
+
+## 🔔 10. **System Features**
+
+```sprout
+notify("Time to stretch!")         // local notification
+vibrate(200ms)                     // haptic feedback
+takePhoto() -> image               // opens camera
+play("audio/alert.mp3")            // sound
+share("Check this out!")           // system share sheet
+```
+
+> All request permission only when used.
+
+---
+
+## 🧮 11. **Functions (lib/utils.sprout)**
+
+```sprout
+fn formatPrice(amount) {
+  return "$" + (amount * 1.08).toFixed(2)
+}
+
+fn isValidEmail(email) {
+  return email.contains("@") and email.contains(".")
+}
+```
+
+Call with: `formatPrice(15)`
+
+---
+
+## 🎨 12. **Styling (Inline)**
+
+```sprout
+label("Hello", color: red, size: 16, bold)
+button("OK", background: #4A90E2, cornerRadius: 8)
+```
+
+Global theme set in `config.sprout`.
+
+---
+
+## 🧪 13. **Conditional Logic**
+
+```sprout
+if count > 5 {
+  label("Great job!", color: green)
+} else {
+  label("Keep going...")
+}
+```
+
+Also: `if item.completed { ... }`
+
+---
+
+## ⏱️ 14. **Time & Delays**
+
+```sprout
+after 3s {
+  notify("Time’s up!")
+}
+
+every 1h {
+  checkWeather()
+}
+```
+
+Great for reminders, polls, alerts.
+
+---
+
+## 🧠 15. **AI Assistant Prompt (In-App)**
+
+Type:
+> “Add a screen to edit notes”
+
+Sprout generates:
+```sprout
+screen EditNote(text) {
+  state input = text
+  ui {
+    input(text: input)
+    button("Save") {
+      emit(input)  // sends back to caller
+      go Back
+    }
+  }
+}
+```
+
+---
+
+## 🧩 Quick Reference Table
+
+| Syntax | Meaning |
+|-------|--------|
+| `state x = 5` | Reactive variable |
+| `button("Go") -> Screen` | Navigate |
+| `button { ... }` | Run code on tap |
+| `list(items) { ... }` | Show a scrollable list |
+| `onLaunch { ... }` | Run when screen opens |
+| `save(path, data)` | Persist data |
+| `notify("...")` | Show notification |
+| `after 5s { ... }` | Delayed action |
+| `fn name() { ... }` | Define function |
+| `component X(...) { ... }` | Reusable UI |
+
+---
+
+## 🌱 Philosophy
+
+SproutScript is:
+- **Minimal** — only 20 core keywords
+- **Readable** — looks like structured English
+- **Forgiving** — auto-corrects common mistakes
+- **Visual** — editor highlights blocks like LEGO
+
+---
+
+📥 **Want this as a downloadable PDF or phone wallpaper?**  
+I can format it for print, or even generate a **live interactive tutorial** inside a Sprout mockup.
+
+Would you like that next? 🌿

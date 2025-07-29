@@ -1,0 +1,17 @@
+[package]
+name = "sprout_compiler"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sprout_compiler"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+wasm3 = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[dependencies.flutter_rust_bridge]
+version = "1.80"
+features = ["dart-ffi"]
