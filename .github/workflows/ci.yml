@@ -1,0 +1,71 @@
+name: CI & Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build Android & iOS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-linux-android
+          override: true
+
+      - name: Install cargo-ndk
+        run: |
+          cargo install cargo-ndk
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Build Rust bridge
+        working-directory: ./flutter
+        run: |
+          dart pub global activate flutter_rust_bridge
+          dart run flutter_rust_bridge:build
+
+      - name: Flutter Packages Get
+        working-directory: ./flutter
+        run: flutter pub get
+
+      - name: Run Analysis
+        working-directory: ./flutter
+        run: flutter analyze
+
+      - name: Run Tests
+        working-directory: ./flutter
+        run: flutter test
+
+      - name: Build Android APK
+        working-directory: ./flutter
+        run: flutter build apk --release
+
+      - name: Build iOS Archive (Simulator)
+        working-directory: ./flutter
+        run: flutter build ios --no-codesign --simulator
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-builds
+          path: |
+            flutter/build/app/outputs/flutter-apk/app-release.apk
+            flutter/build/ios/archive/Sprout.xcarchive
+
+      - name: Success
+        run: echo "✅ All builds completed!"

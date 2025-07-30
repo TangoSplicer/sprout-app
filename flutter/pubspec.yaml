@@ -1,0 +1,30 @@
+# flutter/pubspec.yaml
+name: sprout_mobile
+description: Sprout – Grow apps that grow with you.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  path: ^1.8.3
+  uuid: ^4.3.2
+  wasm3_flutter: ^0.3.0
+  pointycastle: ^3.7.3
+  fixnum: ^1.0.0
+  local_auth: ^2.1.10
+  flutter_highlight: ^0.10.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_rust_bridge: ^1.80
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/

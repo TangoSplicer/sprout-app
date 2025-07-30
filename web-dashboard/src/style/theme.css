@@ -1,0 +1,10 @@
+/* src/style/theme.css */
+:root {
+  --primary: #4A9D5E;
+  --accent: #FFC107;
+  --text: #333;
+  --text-light: #666;
+  --bg: #f9f9f9;
+  --card-bg: white;
+  --border: #ddd;
+}
