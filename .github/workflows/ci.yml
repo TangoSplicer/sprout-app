@@ -1,4 +1,4 @@
-name: CI & Build
+name: Build & Release
 
 on:
   push:
@@ -8,7 +8,6 @@ on:
 
 jobs:
   build:
-    name: Build Android & iOS
     runs-on: ubuntu-latest
 
     steps:
@@ -33,7 +32,7 @@ jobs:
           cargo install cargo-ndk
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Build Rust bridge
+      - name: Build Rust Bridge
         working-directory: ./flutter
         run: |
           dart pub global activate flutter_rust_bridge
@@ -46,6 +45,8 @@ jobs:
       - name: Run Analysis
         working-directory: ./flutter
         run: flutter analyze
+        env:
+          FLUTTER_ROOT: /opt/hostedtoolcache/flutter/3.19.0-stable/x64
 
       - name: Run Tests
         working-directory: ./flutter
@@ -55,17 +56,11 @@ jobs:
         working-directory: ./flutter
         run: flutter build apk --release
 
-      - name: Build iOS Archive (Simulator)
-        working-directory: ./flutter
-        run: flutter build ios --no-codesign --simulator
-
-      - name: Upload Artifacts
+      - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
-          name: release-builds
-          path: |
-            flutter/build/app/outputs/flutter-apk/app-release.apk
-            flutter/build/ios/archive/Sprout.xcarchive
+          name: app-release.apk
+          path: flutter/build/app/outputs/flutter-apk/app-release.apk
 
       - name: Success
-        run: echo "✅ All builds completed!"
+        run: echo "✅ Build successful! APK ready."
