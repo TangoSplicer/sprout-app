@@ -1,6 +1,8 @@
 // flutter/lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'editor_screen.dart';
+import 'settings_screen.dart';
+import '../services/project_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

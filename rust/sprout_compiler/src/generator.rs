@@ -2,6 +2,35 @@
 use crate::ast::*;
 use std::collections::HashMap;
 
+/// Generate WASM bytecode from AST
+pub fn generate(app: &App) -> Vec<u8> {
+    // For now, we'll return a minimal WASM module
+    // In a full implementation, this would compile the AST to WASM
+    
+    // Simple WASM module header (magic number + version)
+    let mut wasm = vec![
+        0x00, 0x61, 0x73, 0x6D, // magic: \0asm
+        0x01, 0x00, 0x00, 0x00, // version: 1
+    ];
+    
+    // Add empty sections for types, imports, functions, exports
+    // This is a minimal valid WASM module
+    
+    // Type section (empty)
+    wasm.extend_from_slice(&[0x01, 0x01, 0x00]);
+    
+    // Function section (empty)
+    wasm.extend_from_slice(&[0x03, 0x01, 0x00]);
+    
+    // Export section (empty)
+    wasm.extend_from_slice(&[0x07, 0x01, 0x00]);
+    
+    // Code section (empty function body)
+    wasm.extend_from_slice(&[0x0A, 0x02, 0x00, 0x00]);
+    
+    wasm
+}
+
 pub struct NativeAppGenerator {
     pub app: App,
     pub project_name: String,

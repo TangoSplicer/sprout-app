@@ -34,16 +34,31 @@ Then tap **Run** — and use your app like any other.
 ## 💡 Getting Started
 
 ```bash
-git clone https://github.com/sprout-app/mobile.git
-cd mobile
+git clone https://github.com/TangoSplicer/sprout-app.git
+cd sprout-app
 
-# Install Flutter
+# Install Flutter dependencies
 flutter pub get
 
 # Build Rust bridge
 dart run flutter_rust_bridge:build
 
 # Run on device
-flutter run# sprout-app
-# sprout-app
-# sprout-app
+flutter run
+```
+
+### Development Requirements
+
+- **Flutter**: 3.10.0 or higher
+- **Rust**: 1.70.0 or higher
+- **Android Studio**: For Android development
+- **Xcode**: For iOS development (macOS only)
+- **VS Code** (recommended): With Flutter and Rust extensions
+
+### Project Structure
+
+- `/flutter`: Flutter mobile app
+- `/rust`: Rust compiler and runtime
+- `/bridge`: Flutter-Rust bridge
+- `/web-dashboard`: Web dashboard for app management
+- `/docs`: Documentation and specifications

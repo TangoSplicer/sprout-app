@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'preview_screen.dart';
 import 'ai_screen.dart';
-import 'share_screen.dart';
+import 'share_screens.dart';
 import '../services/project_service.dart';
 import '../services/reactive_runtime.dart';
 import '../widgets/debug_console.dart';
 import '../widgets/syntax_editor.dart';
 import '../services/language_server.dart';
 import '../services/debugger.dart';
+import '../services/install_service.dart';
 
 class EditorScreen extends StatefulWidget {
   final String projectName;

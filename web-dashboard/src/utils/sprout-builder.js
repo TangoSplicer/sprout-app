@@ -1,5 +1,5 @@
 // src/utils/sprout-builder.js
-import { ZipWriter, TextWriter } from "zipjs";
+import { ZipWriter, TextWriter, BlobWriter } from "zipjs";
 
 export async function createSproutFile(app) {
   const zip = new ZipWriter(new BlobWriter());

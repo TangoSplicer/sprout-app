@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart' show Uint8List;
+import 'package:path_provider/path_provider.dart';
 import '../../bridge/bridge.dart';
 import '../models/project.dart';
 

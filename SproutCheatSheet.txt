@@ -109,6 +109,7 @@ button("Edit") -> EditScreen("Bread", 2)
 
 - Pass data directly as arguments.
 - Go back: `button("Back") -> Back`
+- Navigate with conditions: `button("Save") { if valid { -> Success } else { -> Error } }`
 
 ---
 

@@ -1,4 +1,5 @@
 // src/utils/usb-sync.js
+import { parseSproutFile } from './sprout-parser.js';
 export class USBSync {
   async connect() {
     if (!navigator.usb) {
