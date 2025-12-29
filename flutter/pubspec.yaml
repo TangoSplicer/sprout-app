@@ -1,0 +1,70 @@
+name: sprout_mobile
+description: Sprout – Grow apps that grow with you.
+version: 1.0.0
+
+# Prevent accidental publishing
+publish_to: 'none'
+
+# ✅ Dart 3 + Flutter 3+ (null safety enforced)
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Core
+  path: ^1.9.1
+  uuid: ^4.3.2
+
+  # State & reactivity
+  provider: ^6.1.2
+
+  # QR code
+  qr_flutter: ^4.0.0
+
+  # File compression (for .sprout bundles)
+  archive: ^3.4.5
+  gzip: ^0.4.0
+
+  # File operations
+  open_file: ^3.3.1
+  permission_handler: ^11.3.0
+
+  # Device info
+  device_info_plus: ^10.0.0
+
+  # Flutter → Rust FFI
+  flutter_rust_bridge: ^2.11.1
+
+  # Crypto (E2EE)
+  pointycastle: ^3.7.3
+  fixnum: ^1.0.0
+
+  # Local storage
+  shared_preferences: ^2.3.0
+
+  # Biometrics
+  local_auth: ^2.1.10
+
+  # HTTP (for package manager)
+  http: ^1.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+    - assets/logo_sprout.png
+
+# ✅ flutter_rust_bridge config
+flutter_rust_bridge:
+  rust_project_dir: ../rust/sprout_compiler
+  dart_out_file: lib/generated_bridge.dart
+  rust_crate_dir: ../rust/sprout_compiler
