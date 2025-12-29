@@ -1,12 +1,9 @@
 // src/utils/sprout-parser.js
-import { Gunzip } from 'gzip-js';
 
-// Parse .sprout file (gzip'd tar archive)
+// Parse .sprout file (simplified for MVP)
 export async function parseSproutFile(buffer, fileName) {
   try {
-    const uint8Array = new Uint8Array(buffer);
-    const unzipped = Gunzip(uint8Array);
-    const text = new TextDecoder().decode(unzipped);
+    const text = new TextDecoder().decode(buffer);
 
     // Simple parse: extract app name from main.sprout
     const nameMatch = text.match(/app\s+"([^"]+)"/);
