@@ -1,10 +1,13 @@
-# rust/sprout_compiler/Cargo.toml
 [package]
 name = "sprout_compiler"
 version = "0.1.0"
 edition = "2021"
-description = "Compiler for SproutScript: turn intent into runnable apps"
+description = "Secure compiler for SproutScript: turn intent into runnable apps"
 license = "MIT"
+homepage = "https://github.com/TangoSplicer/sprout-app"
+repository = "https://github.com/TangoSplicer/sprout-app"
+keywords = ["compiler", "mobile", "security", "wasm"]
+categories = ["compilers", "development-tools"]
 
 [lib]
 name = "sprout_compiler"
@@ -12,9 +15,37 @@ crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 thiserror = "1.0"
 wasm3 = "0.5"
+regex = "1.10"
+sha2 = "0.10"
+rand = "0.8"
+anyhow = "1.0"
 
 [dependencies.flutter_rust_bridge]
-version = "1.80"
-features = ["dart-ffi"]
+version = "2.5.0"
+features = ["chrono"]
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.0"
+
+[[bench]]
+name = "parser_bench"
+harness = false
+
+[[bench]]
+name = "compiler_bench" 
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
