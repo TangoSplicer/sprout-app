@@ -17,6 +17,11 @@ dependencies:
   path: ^1.9.1
   uuid: ^4.4.0
   crypto: ^3.0.3
+  
+  # Biometric authentication
+  local_auth: ^2.1.8
+  local_auth_android: ^1.0.18
+  local_auth_darwin: ^1.2.1
 
   # State management & reactivity  
   provider: ^6.1.2
