@@ -1,0 +1,235 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'flutter/**'
+      - 'rust/**'
+      - '.github/workflows/build-apk.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'flutter/**'
+      - 'rust/**'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+env:
+  FLUTTER_VERSION: '3.19.6'
+  JAVA_VERSION: '17'
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-linux-android
+          override: true
+          components: rustfmt, clippy
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: 'r25c'
+
+      - name: Install cargo-ndk
+        run: |
+          cargo install cargo-ndk --locked
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/sprout_compiler/target
+          key: ${{ runner.os }}-apk-${{ hashFiles('**/pubspec.lock', '**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-apk-
+
+      - name: Verify Environment
+        run: |
+          echo "🔧 Environment Check"
+          flutter doctor -v
+          rustc --version
+          cargo --version
+          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+          echo "NDK_HOME: $NDK_HOME"
+
+      - name: Install Flutter Dependencies
+        working-directory: ./flutter
+        run: |
+          flutter pub get
+          dart pub global activate flutter_rust_bridge_codegen
+
+      - name: Rust Quality Checks
+        working-directory: ./rust/sprout_compiler
+        run: |
+          echo "🦀 Rust Quality Checks"
+          cargo fmt -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --verbose
+
+      - name: Build Rust Bridge
+        working-directory: ./flutter
+        run: |
+          echo "🌉 Building Rust Bridge"
+          flutter_rust_bridge_codegen
+          
+          # Verify bridge was generated
+          if [ ! -f "lib/generated_bridge.dart" ]; then
+            echo "❌ Bridge generation failed"
+            exit 1
+          fi
+          
+          echo "✅ Rust bridge generated successfully"
+
+      - name: Flutter Quality Checks
+        working-directory: ./flutter
+        run: |
+          echo "🎨 Flutter Quality Checks"
+          flutter analyze --fatal-infos
+          flutter test
+          
+          echo "✅ Flutter checks completed"
+
+      - name: Build APK
+        working-directory: ./flutter
+        run: |
+          echo "📱 Building APK"
+          
+          if [ "${{ github.event.inputs.build_type }}" = "release" ] || [ "${{ github.event_name }}" = "push" ]; then
+            BUILD_TYPE="release"
+            BUILD_ARGS="--release --obfuscate --split-debug-info=./build/symbols"
+          else
+            BUILD_TYPE="debug"
+            BUILD_ARGS="--debug"
+          fi
+          
+          flutter build apk $BUILD_ARGS \
+            --target-platform=android-arm64 \
+            --dart-define=BUILD_NUMBER="${{ github.run_number }}" \
+            --dart-define=BUILD_COMMIT="${{ github.sha }}" \
+            --verbose
+          
+          echo "✅ APK build completed (${BUILD_TYPE})"
+
+      - name: Verify APK
+        run: |
+          echo "🔍 Verifying Build Artifacts"
+          
+          if [ "${{ github.event.inputs.build_type }}" = "release" ] || [ "${{ github.event_name }}" = "push" ]; then
+            APK_PATH="flutter/build/app/outputs/flutter-apk/app-release.apk"
+          else
+            APK_PATH="flutter/build/app/outputs/flutter-apk/app-debug.apk"
+          fi
+          
+          if [ ! -f "$APK_PATH" ]; then
+            echo "❌ APK not found at $APK_PATH"
+            exit 1
+          fi
+          
+          APK_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || stat -f%z "$APK_PATH")
+          echo "📊 APK Size: $(($APK_SIZE / 1024 / 1024)) MB"
+          
+          if [ "$APK_SIZE" -lt 1000000 ]; then
+            echo "⚠️  APK seems unusually small ($APK_SIZE bytes)"
+            exit 1
+          fi
+          
+          # Calculate checksums
+          SHA256=$(sha256sum "$APK_PATH" | cut -d' ' -f1)
+          MD5=$(md5sum "$APK_PATH" | cut -d' ' -f1)
+          echo "🔐 APK SHA256: $SHA256"
+          echo "🔐 APK MD5: $MD5"
+          echo "apk_sha256=$SHA256" >> $GITHUB_ENV
+          echo "apk_md5=$MD5" >> $GITHUB_ENV
+          
+          # Verify APK structure
+          if command -v aapt > /dev/null 2>&1; then
+            echo "📋 APK Info:"
+            aapt dump badging "$APK_PATH" | head -5
+          fi
+          
+          echo "✅ Build verification completed"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprout-apk-${{ github.run_number }}
+          path: |
+            flutter/build/app/outputs/flutter-apk/*.apk
+            flutter/build/symbols/
+          retention-days: 30
+
+      - name: Generate Build Summary
+        if: always()
+        run: |
+          echo "## 📱 APK Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Type**: ${{ github.event.inputs.build_type || 'release' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**APK SHA256**: \`${{ env.apk_sha256 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**APK MD5**: \`${{ env.apk_md5 }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download" >> $GITHUB_STEP_SUMMARY
+          echo "APK is available as a workflow artifact in the Actions tab." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 📱 APK Build Complete ✅
+              
+              **Build Number**: \`${{ github.run_number }}\`
+              **Commit**: \`${{ github.sha }}\`
+              **SHA256**: \`${{ env.apk_sha256 }}\`
+              
+              ### 📥 Download
+              You can download the APK from the workflow artifacts in the Actions tab.
+              
+              Built with Flutter ${{ env.FLUTTER_VERSION }} and Rust.`
+            })
