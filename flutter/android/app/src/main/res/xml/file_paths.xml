@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Security: File Provider Configuration -->
+<paths>
+    <!-- Security: External storage for exported files -->
+    <external-path name="external_files" path="." />
+    
+    <!-- Security: Cache directory -->
+    <cache-path name="cache" path="." />
+    
+    <!-- Security: Files directory -->
+    <files-path name="files" path="." />
+    
+    <!-- Security: App-specific external storage -->
+    <external-files-path name="external_app_files" path="." />
+    
+    <!-- Security: Temporary files -->
+    <cache-path name="temp" path="tmp/" />
+</paths>

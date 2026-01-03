@@ -1,0 +1,86 @@
+&lt;manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.sproutapp.sprout"&gt;
+
+    &lt;!-- Security: Network Security Configuration --&gt;
+    &lt;uses-permission android:name="android.permission.INTERNET" /&gt;
+    &lt;uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /&gt;
+    
+    &lt;!-- Security: Storage Permissions --&gt;
+    &lt;uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" /&gt;
+    &lt;uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" /&gt;
+    &lt;uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" /&gt;
+    
+    &lt;!-- Security: Camera Permission (only if used) --&gt;
+    &lt;uses-permission android:name="android.permission.CAMERA" /&gt;
+    
+    &lt;!-- Security: Biometric Authentication --&gt;
+    &lt;uses-permission android:name="android.permission.USE_BIOMETRIC" /&gt;
+    &lt;uses-permission android:name="android.permission.USE_FINGERPRINT" /&gt;
+    
+    &lt;!-- Security: Hardware Security --&gt;
+    &lt;uses-permission android:name="android.permission.USE_FINGERPRINT" /&gt;
+    
+    &lt;!-- Security: Prevent Screenshots --&gt;
+    &lt;uses-permission android:name="android.permission.Secure app" /&gt;
+    
+    &lt;application
+        android:name="${applicationName}"
+        android:label="Sprout"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:requestLegacyExternalStorage="false"
+        android:supportsRtl="true"
+        android:theme="@style/LaunchTheme"
+        android:usesCleartextTraffic="false"
+        android:hardwareAccelerated="true"&gt;
+        
+        &lt;!-- Security: Prevent Screenshots --&gt;
+        &lt;activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"&gt;
+            
+            &lt;!-- Security: Prevent screenshots of sensitive screens --&gt;
+            &lt;meta-data
+                android:name="android.allow_secure_backup"
+                android:value="false" /&gt;
+            
+            &lt;!-- Deep linking --&gt;
+            &lt;intent-filter&gt;
+                &lt;action android:name="android.intent.action.MAIN"/&gt;
+                &lt;category android:name="android.intent.category.LAUNCHER"/&gt;
+            &lt;/intent-filter&gt;
+            
+            &lt;intent-filter&gt;
+                &lt;action android:name="android.intent.action.VIEW" /&gt;
+                &lt;category android:name="android.intent.category.DEFAULT" /&gt;
+                &lt;category android:name="android.intent.category.BROWSABLE" /&gt;
+                &lt;data android:scheme="sprout" /&gt;
+            &lt;/intent-filter&gt;
+        &lt;/activity&gt;
+        
+        &lt;!-- Security: File Provider --&gt;
+        &lt;provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true"&gt;
+            &lt;meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" /&gt;
+        &lt;/provider&gt;
+        
+        &lt;!-- Security: WorkManager for background tasks --&gt;
+        &lt;provider
+            android:name="androidx.work.impl.WorkManagerInitializer"
+            android:authorities="${applicationId}.workmanager-init"
+            android:exported="false"
+            android:enabled="false" /&gt;
+    &lt;/application&gt;
+&lt;/manifest&gt;

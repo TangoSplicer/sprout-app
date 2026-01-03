@@ -1,0 +1,25 @@
+&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;!-- Security: Network Security Configuration --&gt;
+&lt;network-security-config&gt;
+    &lt;!-- Security: No cleartext traffic allowed --&gt;
+    &lt;base-config cleartextTrafficPermitted="false"&gt;
+        &lt;trust-anchors&gt;
+            &lt;!-- Security: Only trust system certificates --&gt;
+            &lt;certificates src="system" /&gt;
+        &lt;/trust-anchors&gt;
+    &lt;/base-config&gt;
+    
+    &lt;!-- Security: Localhost only for debugging --&gt;
+    &lt;domain-config cleartextTrafficPermitted="true"&gt;
+        &lt;domain includeSubdomains="true"&gt;localhost&lt;/domain&gt;
+        &lt;domain includeSubdomains="true"&gt;127.0.0.1&lt;/domain&gt;
+    &lt;/domain-config&gt;
+    
+    &lt;!-- Security: Debug configuration (disabled in release) --&gt;
+    &lt;debug-overrides&gt;
+        &lt;trust-anchors&gt;
+            &lt;certificates src="user" /&gt;
+            &lt;certificates src="system" /&gt;
+        &lt;/trust-anchors&gt;
+    &lt;/debug-overrides&gt;
+&lt;/network-security-config&gt;

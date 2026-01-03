@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sprout</string>
+    <string name="app_description">Grow apps that grow with you</string>
+    
+    <!-- Security Messages -->
+    <string name="security_warning">Security Warning</string>
+    <string name="security_check_failed">Security check failed</string>
+    <string name="biometric_required">Biometric authentication required</string>
+    <string name="biometric_not_available">Biometric authentication not available</string>
+    <string name="biometric_not_enrolled">No biometric credentials enrolled</string>
+    
+    <!-- Permissions -->
+    <string name="permission_rationale">Permission required for app functionality</string>
+    <string name="permission_denied">Permission denied. Some features may not work.</string>
+    <string name="permission_settings">Go to settings</string>
+    
+    <!-- Errors -->
+    <string name="error_generic">An error occurred</string>
+    <string name="error_network">Network error</string>
+    <string name="error_storage">Storage error</string>
+    <string name="error_compilation">Compilation error</string>
+    <string name="error_runtime">Runtime error</string>
+</resources>

@@ -579,6 +579,7 @@ pub mod parser;
 pub mod generator;
 pub mod runtime;
 pub mod security;
+pub mod bridge_generated;
 
 #[cfg(test)]
 mod tests {

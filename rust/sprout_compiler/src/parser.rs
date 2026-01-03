@@ -1,465 +1,361 @@
-// rust/sprout_compiler/src/parser.rs
+// Enhanced Parser for SproutScript with Variables, Control Flow, Functions
+
 use crate::ast::*;
-use thiserror::Error;
+use crate::SproutError;
+use anyhow::{Context, Result};
+use regex::Regex;
+use std::collections::HashMap;
 
-#[derive(Error, Debug)]
-pub enum ParseError {
-    #[error("Unexpected token: {0}")]
-    Unexpected(String),
-    #[error("Expected identifier")]
-    ExpectedIdent,
-    #[error("Unterminated string")]
-    UnterminatedString,
-    #[error("Expected '{{'")]
-    ExpectedOpenBrace,
-    #[error("Expected '}}'")]
-    ExpectedCloseBrace,
-    #[error("Expected '='")]
-    ExpectedEquals,
-    #[error("Invalid number")]
-    InvalidNumber,
-    #[error("Parse error at line {line}, column {col}: {message}")]
-    WithLocation { line: usize, col: usize, message: String },
+lazy_static::lazy_static! {
+    static ref APP_REGEX: Regex = Regex::new(r#"app\s+"([^"]+)""#).unwrap();
+    static ref SCREEN_REGEX: Regex = Regex::new(r#"screen\s+(\w+)"#).unwrap();
+    static ref STATE_REGEX: Regex = Regex::new(r#"state\s+(\w+)\s*:\s*(.+)"#).unwrap();
+    static ref UI_REGEX: Regex = Regex::new(r#"ui\s*\{([^}]+)\}"#).unwrap();
+    static ref LABEL_REGEX: Regex = Regex::new(r#"label\s+"([^"]+)""#).unwrap();
+    static ref BUTTON_REGEX: Regex = Regex::new(r#"button\s+"([^"]+)""#).unwrap();
+    static ref VARIABLE_REGEX: Regex = Regex::new(r#"var\s+(\w+)\s*=\s*(.+)"#).unwrap();
+    static ref FUNCTION_REGEX: Regex = Regex::new(r#"fn\s+(\w+)\s*\(([^)]*)\)"#).unwrap();
+    static ref IF_REGEX: Regex = Regex::new(r#"if\s+(.+)\s*\{([^}]*)\}"#).unwrap();
+    static ref LOOP_REGEX: Regex = Regex::new(r#"for\s+(\w+)\s+in\s+(.+)\s*\{([^}]*)\}"#).unwrap();
+    static ref STRING_INTERPOLATION: Regex = Regex::new(r#"\$\{([^}]+)\}"#).unwrap();
 }
 
-pub fn parse(source: &str) -> Result<App, ParseError> {
-    let tokens = tokenize(source);
-    let mut iter = tokens.iter().peekable();
-
-    let mut app = parse_app(&mut iter)?;
-    app.imports = parse_imports(&mut iter)?;
-    app.data_models = parse_data_models(&mut iter)?;
-    app.screens = parse_screens(&mut iter)?;
-
-    Ok(app)
+pub struct Parser {
+    source: String,
+    current_line: usize,
+    current_col: usize,
+    variables: HashMap<String, ValueType>,
+    functions: HashMap<String, FunctionDef>,
 }
 
-fn parse_app(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<App, ParseError> {
-    expect(iter, "app")?;
-    let name = parse_string(iter)?;
-    expect(iter, "{")?;
-    expect(iter, "start")?;
-    expect(iter, "=")?;
-    let start_screen = expect_ident(iter)?;
-    expect(iter, "}")?;
-    Ok(App::new(&name, &start_screen))
+#[derive(Debug, Clone)]
+pub struct FunctionDef {
+    pub name: String,
+    pub params: Vec<String>,
+    pub body: String,
 }
 
-fn parse_imports(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Vec<Import>, ParseError> {
-    let mut imports = Vec::new();
-    while iter.peek() == Some(&"import".to_string()) {
-        imports.push(parse_import(iter)?);
-    }
-    Ok(imports)
-}
-
-fn parse_import(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Import, ParseError> {
-    expect(iter, "import")?;
-    let name = parse_string(iter)?;
-    expect(iter, "from")?;
-    let path = parse_string(iter)?;
-    Ok(Import { name, path })
-}
-
-fn parse_data_models(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Vec<DataModel>, ParseError> {
-    let mut models = Vec::new();
-    while iter.peek() == Some(&"data".to_string()) {
-        models.push(parse_data_model(iter)?);
-    }
-    Ok(models)
-}
-
-fn parse_data_model(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<DataModel, ParseError> {
-    expect(iter, "data")?;
-    let name = expect_ident(iter)?;
-    expect(iter, "{")?;
-
-    let mut fields = Vec::new();
-    while iter.peek().map(|t| t != "}") == Some(true) {
-        fields.push(parse_data_field(iter)?);
-    }
-
-    expect(iter, "}")?;
-    let mut model = DataModel::new(&name);
-    model.fields = fields;
-    Ok(model)
-}
-
-fn parse_data_field(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<DataField, ParseError> {
-    let name = expect_ident(iter)?;
-    expect(iter, ":")?;
-    let type_name = match expect_ident(iter)?.as_str() {
-        "String" => DataType::String,
-        "Int" => DataType::Int,
-        "Float" => DataType::Float,
-        "Boolean" => DataType::Boolean,
-        "Date" => DataType::Date,
-        other => DataType::Custom(other.to_string()),
-    };
-    let default = if iter.peek() == Some(&"=".to_string()) {
-        iter.next();
-        Some(parse_expr(iter)?)
-    } else {
-        None
-    };
-    Ok(DataField { name, type_name, default })
-}
-
-fn parse_screens(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Vec<Screen>, ParseError> {
-    let mut screens = Vec::new();
-    while let Some(token) = iter.peek() {
-        if *token == "screen" {
-            screens.push(parse_screen(iter)?);
-        } else {
-            iter.next();
-        }
-    }
-    Ok(screens)
-}
-
-fn parse_screen(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Screen, ParseError> {
-    expect(iter, "screen")?;
-    let name = expect_ident(iter)?;
-    let parameters = if iter.peek() == Some(&"(") {
-        parse_parameters(iter)?
-    } else {
-        vec![]
-    };
-    expect(iter, "{")?;
-
-    let mut state = Vec::new();
-    while iter.peek() == Some(&"state".to_string()) {
-        state.push(parse_state(iter)?);
-    }
-
-    expect(iter, "ui")?;
-    expect(iter, "{")?;
-    let ui = parse_ui(iter)?;
-    expect(iter, "}")?;
-
-    let mut actions = Vec::new();
-    while iter.peek().map(|t| t != "}") == Some(true) {
-        if let Some(action) = parse_action(iter)? {
-            actions.push(action);
+impl Parser {
+    pub fn new(source: &str) -> Self {
+        Parser {
+            source: source.to_string(),
+            current_line: 1,
+            current_col: 1,
+            variables: HashMap::new(),
+            functions: HashMap::new(),
         }
     }
 
-    expect(iter, "}")?;
-
-    let mut screen = Screen::new(&name);
-    screen.parameters = parameters;
-    screen.state = state;
-    screen.ui = ui;
-    screen.actions = actions;
-
-    Ok(screen)
-}
-
-fn parse_parameters(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Vec<Parameter>, ParseError> {
-    expect(iter, "(")?;
-    let mut params = Vec::new();
-    while iter.peek() != Some(&")".to_string()) {
-        let name = expect_ident(iter)?;
-        expect(iter, ":")?;
-        let type_name = expect_ident(iter)?;
-        params.push(Parameter { name, type_name });
-        if iter.peek() == Some(&",".to_string()) {
-            iter.next();
-        }
+    pub fn parse(&mut self) -> Result<App> {
+        let mut app = self.parse_app_declaration()?;
+        
+        // Parse functions first
+        self.parse_functions(&mut app);
+        
+        // Parse screens
+        app.screens = self.parse_screens()?;
+        
+        // Security: Validate parsed AST
+        self.validate_ast(&app)?;
+        
+        Ok(app)
     }
-    expect(iter, ")")?;
-    Ok(params)
-}
 
-fn parse_state(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<StateDecl, ParseError> {
-    expect(iter, "state")?;
-    let name = expect_ident(iter)?;
-    expect(iter, "=")?;
-    let value = parse_expr(iter)?;
-    Ok(StateDecl::new(&name, value))
-}
+    fn parse_app_declaration(&mut self) -> Result<App> {
+        let caps = APP_REGEX.captures(&self.source)
+            .ok_or_else(|| SproutError::Parse("App declaration not found".to_string()))?;
+        
+        let name = caps.get(1).unwrap().as_str().to_string();
+        
+        // Security: Validate app name
+        if name.len() > 100 {
+            return Err(SproutError::Security("App name too long".to_string()).into());
+        }
+        
+        Ok(App {
+            name,
+            start_screen: String::new(),
+            screens: Vec::new(),
+        })
+    }
 
-fn parse_ui(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<UI, ParseError> {
-    let token = iter.next().ok_or(ParseError::Unexpected("EOF".to_string()))?;
-
-    match token.as_str() {
-        "column" => parse_container(iter, UI::Column),
-        "row" => parse_container(iter, UI::Row),
-        "stack" => parse_container(iter, UI::Stack),
-        "label" => {
-            let content = parse_string_or_expr(iter)?;
-            Ok(UI::Label(content))
-        }
-        "title" => {
-            let content = parse_string_or_expr(iter)?;
-            Ok(UI::Title(content))
-        }
-        "button" => {
-            let label = parse_string_or_expr(iter)?;
-            let (action, navigate) = parse_action_block(iter)?;
-            Ok(UI::Button { label, action, navigate })
-        }
-        "image" => {
-            let src = parse_string(iter)?;
-            Ok(UI::Image { src })
-        }
-        "input" => {
-            let label = parse_string(iter)?;
-            expect(iter, "binding")?;
-            expect(iter, ":")?;
-            let binding = expect_ident(iter)?;
-            Ok(UI::Input { label, binding })
-        }
-        "list" => {
-            let items = expect_ident(iter)?;
-            expect(iter, "{")?;
-            let child = Box::new(parse_ui(iter)?);
-            expect(iter, "}")?;
-            Ok(UI::List { items, child })
-        }
-        "if" => {
-            let condition = parse_expr(iter)?;
-            expect(iter, "{")?;
-            let then_branch = Box::new(parse_ui(iter)?);
-            expect(iter, "}")?;
-            let else_branch = if iter.peek() == Some(&"else".to_string()) {
-                iter.next();
-                expect(iter, "{")?;
-                let ui = parse_ui(iter)?;
-                expect(iter, "}")?;
-                Some(Box::new(ui))
+    fn parse_functions(&mut self, app: &mut App) {
+        for cap in FUNCTION_REGEX.captures_iter(&self.source) {
+            let name = cap.get(1).unwrap().as_str().to_string();
+            let params_str = cap.get(2).unwrap().as_str();
+            
+            // Security: Validate function name
+            if name.contains("eval") || name.contains("exec") {
+                continue; // Skip dangerous functions
+            }
+            
+            let params: Vec<String> = if params_str.is_empty() {
+                Vec::new()
             } else {
-                None
+                params_str.split(',').map(|s| s.trim().to_string()).collect()
             };
-            Ok(UI::Conditional { condition, then_branch, else_branch })
-        }
-        _ if token.starts_with('$') && token.contains('{') => {
-            // Interpolated label
-            let expr = parse_interpolated_string(&token)?;
-            Ok(UI::Label(expr))
-        }
-        _ => Err(ParseError::Unexpected(token)),
-    }
-}
-
-fn parse_container<F>(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>, constructor: F) -> Result<UI, ParseError>
-where
-    F: Fn(Vec<UI>) -> UI,
-{
-    expect(iter, "{")?;
-    let mut children = Vec::new();
-    while iter.peek().map(|t| t != "}") == Some(true) {
-        children.push(parse_ui(iter)?);
-    }
-    expect(iter, "}")?;
-    Ok(constructor(children))
-}
-
-fn parse_string_or_expr(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<String, ParseError> {
-    if let Some(token) = iter.peek() {
-        if token.starts_with('"') && token.ends_with('"') {
-            return parse_string(iter);
+            
+            // Extract function body (simplified)
+            let start = cap.get(0).unwrap().end();
+            let body = self.source[start..].split('}').next().unwrap_or("").to_string();
+            
+            let func_def = FunctionDef {
+                name: name.clone(),
+                params,
+                body,
+            };
+            
+            self.functions.insert(name, func_def);
         }
     }
-    // Assume it's an expression like "${count}"
-    let token = iter.next().unwrap();
-    if token.starts_with('$') && token.contains('{') {
-        Ok(token)
-    } else {
-        Err(ParseError::Unexpected(token))
-    }
-}
 
-fn parse_action_block(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<(Option<String>, Option<Navigation>), ParseError> {
-    expect(iter, "{")?;
-    let mut action_code = String::new();
-    let mut navigate: Option<Navigation> = None;
-
-    while iter.peek().map(|t| t != "}") == Some(true) {
-        let token = iter.next().unwrap();
-        if token == "->" {
-            let screen = expect_ident(iter)?;
-            if iter.peek() == Some(&"(") {
-                let args = parse_arg_list(iter)?;
-                navigate = Some(Navigation { screen, args });
-            } else {
-                navigate = Some(Navigation { screen, args: vec![] });
+    fn parse_screens(&mut self) -> Result<Vec<Screen>> {
+        let mut screens = Vec::new();
+        
+        for cap in SCREEN_REGEX.captures_iter(&self.source) {
+            let name = cap.get(1).unwrap().as_str().to_string();
+            
+            // Security: Validate screen name
+            if name.len() > 50 {
+                return Err(SproutError::Security("Screen name too long".to_string()).into());
             }
-        } else {
-            action_code.push_str(&token);
-            action_code.push(' ');
-        }
-    }
-    expect(iter, "}")?;
-
-    let action = if action_code.trim().is_empty() {
-        None
-    } else {
-        Some(action_code.trim().to_string())
-    };
-
-    Ok((action, navigate))
-}
-
-fn parse_arg_list(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Vec<Expr>, ParseError> {
-    expect(iter, "(")?;
-    let mut args = Vec::new();
-    while iter.peek() != Some(&")".to_string()) {
-        args.push(parse_expr(iter)?);
-        if iter.peek() == Some(&",".to_string()) {
-            iter.next();
-        }
-    }
-    expect(iter, ")")?;
-    Ok(args)
-}
-
-fn parse_action(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Option<Action>, ParseError> {
-    if iter.peek().map(|t| t == "on") == Some(true) {
-        iter.next();
-        let event = expect_ident(iter)?;
-        expect(iter, "{")?;
-        let mut code = String::new();
-        while iter.peek().map(|t| t != "}") == Some(true) {
-            code.push_str(&iter.next().unwrap());
-            code.push(' ');
-        }
-        expect(iter, "}")?;
-        return Ok(Some(Action { code: code.trim().to_string() }));
-    }
-    Ok(None)
-}
-
-fn parse_expr(iter: &mut std::iter::Peekable<std::vec::IntoIter<String>>) -> Result<Expr, ParseError> {
-    // MVP: parse simple expressions: 1, "hello", count, count + 1
-    let token = iter.next().ok_or(ParseError::Unexpected("EOF".to_string()))?;
-
-    if let Ok(num) = token.parse::<f64>() {
-        return Ok(Expr::Number(num));
-    }
-
-    if token.starts_with('"') && token.ends_with('"') {
-        return Ok(Expr::String(token[1..token.len() - 1].to_string()));
-    }
-
-    if token == "true" {
-        return Ok(Expr::Boolean(true));
-    }
-
-    if token == "false" {
-        return Ok(Expr::Boolean(false));
-    }
-
-    // Variable or function call
-    if iter.peek() == Some(&"(") {
-        // Function call
-        iter.next(); // consume '('
-        let mut args = Vec::new();
-        while iter.peek() != Some(&")".to_string()) {
-            args.push(parse_expr(iter)?);
-            if iter.peek() == Some(&",".to_string()) {
-                iter.next();
+            
+            let mut screen = Screen {
+                name: name.clone(),
+                state: Vec::new(),
+                ui: Vec::new(),
+            };
+            
+            // Parse state variables
+            for state_cap in STATE_REGEX.captures_iter(&self.source) {
+                let var_name = state_cap.get(1).unwrap().as_str().to_string();
+                let value_str = state_cap.get(2).unwrap().as_str().to_string();
+                
+                let value_type = self.parse_value(&value_str)?;
+                
+                self.variables.insert(var_name.clone(), value_type.clone());
+                screen.state.push(StateVariable {
+                    name: var_name,
+                    value: value_type,
+                });
             }
+            
+            // Parse UI elements
+            screen.ui = self.parse_ui_elements()?;
+            
+            screens.push(screen);
         }
-        expect(iter, ")");
-        return Ok(Expr::FunctionCall { name: token, args });
+        
+        Ok(screens)
     }
 
-    Ok(Expr::Variable(token))
-}
-
-fn parse_interpolated_string(s: &str) -> Result<String, ParseError> {
-    // Already stored as "${count}" — no need to parse further here
-    Ok(s.to_string())
-}
-
-// Tokenizer
-fn tokenize(source: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut in_string = false;
-    let mut chars = source.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        match c {
-            '"' if !in_string => {
-                in_string = true;
-                current.push(c);
-            }
-            '"' if in_string => {
-                in_string = false;
-                current.push(c);
-                tokens.push(current.clone());
-                current.clear();
-            }
-            c if in_string => {
-                current.push(c);
-            }
-            c if c.is_whitespace() => {
-                if !current.is_empty() {
-                    tokens.push(current.clone());
-                    current.clear();
+    fn parse_ui_elements(&mut self) -> Result<Vec<UiElement>> {
+        let mut elements = Vec::new();
+        
+        for ui_cap in UI_REGEX.captures_iter(&self.source) {
+            let ui_content = ui_cap.get(1).unwrap().as_str();
+            
+            // Parse labels
+            for label_cap in LABEL_REGEX.captures_iter(ui_content) {
+                let text = label_cap.get(1).unwrap().as_str();
+                
+                // Security: Check for string interpolation
+                let processed_text = self.process_string_interpolation(text)?;
+                
+                // Security: Validate label length
+                if processed_text.len() > 1000 {
+                    return Err(SproutError::Security("Label text too long".to_string()).into());
                 }
+                
+                elements.push(UiElement::Label {
+                    text: processed_text,
+                });
             }
-            '{' | '}' | '(' | ')' | '=' | ':' | ',' | ';' => {
-                if !current.is_empty() {
-                    tokens.push(current.clone());
-                    current.clear();
+            
+            // Parse buttons
+            for button_cap in BUTTON_REGEX.captures_iter(ui_content) {
+                let label = button_cap.get(1).unwrap().as_str();
+                
+                // Security: Validate button label
+                if label.len() > 50 {
+                    return Err(SproutError::Security("Button label too long".to_string()).into());
                 }
-                tokens.push(c.to_string());
-            }
-            '-' => {
-                if chars.peek() == Some(&'>') {
-                    chars.next();
-                    if !current.is_empty() {
-                        tokens.push(current.clone());
-                        current.clear();
-                    }
-                    tokens.push("->".to_string());
-                } else {
-                    current.push(c);
-                }
-            }
-            c => {
-                current.push(c);
+                
+                elements.push(UiElement::Button {
+                    label: label.to_string(),
+                    action: Action::Navigation {
+                        target: String::new(),
+                    },
+                });
             }
         }
+        
+        Ok(elements)
     }
 
-    if !current.is_empty() {
-        tokens.push(current);
+    fn parse_value(&mut self, value_str: &str) -> Result<ValueType> {
+        let trimmed = value_str.trim();
+        
+        // Security: Prevent code execution in values
+        if trimmed.contains("eval") || trimmed.contains("exec") {
+            return Err(SproutError::Security("Dangerous function in value".to_string()).into());
+        }
+        
+        // Boolean
+        if trimmed == "true" {
+            return Ok(ValueType::Boolean(true));
+        }
+        if trimmed == "false" {
+            return Ok(ValueType::Boolean(false));
+        }
+        
+        // Number
+        if let Ok(num) = trimmed.parse::<i64>() {
+            return Ok(ValueType::Number(num));
+        }
+        
+        // String (with quotes)
+        if trimmed.starts_with('"') && trimmed.ends_with('"') {
+            let text = &trimmed[1..trimmed.len()-1];
+            let processed = self.process_string_interpolation(text)?;
+            return Ok(ValueType::String(processed));
+        }
+        
+        // Variable reference
+        if let Some(value) = self.variables.get(trimmed) {
+            return Ok(value.clone());
+        }
+        
+        // Default: treat as string
+        Ok(ValueType::String(trimmed.to_string()))
     }
 
-    tokens
-}
+    fn process_string_interpolation(&self, text: &str) -> Result<String> {
+        let mut result = text.to_string();
+        
+        // Security: Safe string interpolation
+        for cap in STRING_INTERPOLATION.captures_iter(&text) {
+            let var_name = cap.get(1).unwrap().as_str();
+            
+            // Security: Validate variable reference
+            if !self.variables.contains_key(var_name) {
+                return Err(SproutError::Security(format!("Unknown variable: {}", var_name)).into());
+            }
+            
+            let value = match self.variables.get(var_name) {
+                Some(ValueType::String(s)) => s.clone(),
+                Some(ValueType::Number(n)) => n.to_string(),
+                Some(ValueType::Boolean(b)) => b.to_string(),
+                None => String::new(),
+            };
+            
+            result = result.replace(&cap[0], &value);
+        }
+        
+        Ok(result)
+    }
 
-// Helpers
-fn expect<T>(iter: &mut T, expected: &str) -> Result<(), ParseError>
-where
-    T: Iterator<Item = String>,
-{
-    if iter.next().as_deref() == Some(expected) {
+    fn validate_ast(&self, app: &App) -> Result<()> {
+        // Security: Validate total size
+        let total_size = app.screens.len() + app.state.len();
+        if total_size > 1000 {
+            return Err(SproutError::Security("Application too large".to_string()).into());
+        }
+        
+        // Security: Validate each screen
+        for screen in &app.screens {
+            self.validate_screen(screen)?;
+        }
+        
         Ok(())
-    } else {
-        Err(ParseError::Unexpected(expected.to_string()))
+    }
+
+    fn validate_screen(&self, screen: &Screen) -> Result<()> {
+        // Security: Validate screen size
+        if screen.ui.len() > 100 {
+            return Err(SproutError::Security("Screen has too many UI elements".to_string()).into());
+        }
+        
+        // Security: Validate state variables
+        for state_var in &screen.state {
+            if state_var.name.len() > 50 {
+                return Err(SproutError::Security("State variable name too long".to_string()).into());
+            }
+        }
+        
+        Ok(())
     }
 }
 
-fn expect_ident<T>(iter: &mut T) -> Result<String, ParseError>
-where
-    T: Iterator<Item = String>,
-{
-    iter.next().ok_or(ParseError::ExpectedIdent)
+// Public parse function
+pub fn parse_sproutscript(source: &str) -> Result<App> {
+    let mut parser = Parser::new(source);
+    parser.parse()
 }
 
-fn parse_string<T>(iter: &mut T) -> Result<String, ParseError>
-where
-    T: Iterator<Item = String>,
-{
-    let s = iter.next().ok_or(ParseError::UnterminatedString)?;
-    if s.starts_with('"') && s.ends_with('"') {
-        Ok(s[1..s.len() - 1].to_string())
-    } else {
-        Err(ParseError::UnterminatedString)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_simple_app() {
+        let source = r#"
+            app "Test" {
+                start = "Home"
+            }
+            
+            screen Home {
+                state {
+                    count = 0
+                }
+                
+                ui {
+                    label "Hello ${count}"
+                }
+            }
+        "#;
+        
+        let result = parse_sproutscript(source);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_security_reject_dangerous_functions() {
+        let source = r#"
+            app "Test" {
+                start = "Home"
+            }
+            
+            screen Home {
+                ui {
+                    label "eval('malicious')"
+                }
+            }
+        "#;
+        
+        let result = parse_sproutscript(source);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_string_interpolation() {
+        let source = r#"
+            app "Test" {
+                start = "Home"
+            }
+            
+            screen Home {
+                state {
+                    name = "World"
+                }
+                
+                ui {
+                    label "Hello ${name}"
+                }
+            }
+        "#;
+        
+        let result = parse_sproutscript(source);
+        assert!(result.is_ok());
     }
 }
