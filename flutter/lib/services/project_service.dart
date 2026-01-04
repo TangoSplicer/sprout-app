@@ -683,4 +683,15 @@ class SecurityException implements Exception {
   @override
   String toString() => 'SecurityException: $message';
 }
-             
+            
+
+// Define these at the bottom of the file
+class SecurityException implements Exception {
+  final String message;
+  SecurityException(this.message);
+  @override
+  String toString() => 'SecurityException: $message';
+}
+
+class ProjectException implements Exception {}
+class CompileException implements Exception {}
