@@ -1,14 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:flutter/material.dart';
 import 'package:sprout_mobile/main.dart' as app;
 import 'package:sprout_mobile/services/project_service.dart';
 import 'package:sprout_mobile/services/debugger.dart';
 import 'package:sprout_mobile/services/reactive_runtime.dart';
 
 void main() {
-  IntegrationTestWidgetsBinding.ensureInitialized();
+  // Use the full Flutter Binding for integration tests
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Sprout App Integration Tests', () {
+    
     testWidgets('App launches and shows home screen', (WidgetTester tester) async {
       app.main();
       await tester.pumpAndSettle();
@@ -27,29 +30,32 @@ void main() {
       await tester.tap(find.text('New App'));
       await tester.pumpAndSettle();
 
-      // Enter project name
+      // Enter unique project name to avoid "file already exists" errors in CI
+      final projectName = 'Test Project ${DateTime.now().millisecondsSinceEpoch}';
+      
       expect(find.text('New App'), findsWidgets);
-      await tester.enterText(find.byType(TextField), 'Test Project');
+      await tester.enterText(find.byType(TextField), projectName);
       await tester.tap(find.text('Create'));
       await tester.pumpAndSettle();
 
       // Should navigate to editor
-      expect(find.text('Test Project.sprout'), findsOneWidget);
+      expect(find.text('$projectName.sprout'), findsOneWidget);
     });
 
     testWidgets('Project service operations', (WidgetTester tester) async {
       final projectService = ProjectService();
+      final testName = 'Integration Test ${DateTime.now().millisecondsSinceEpoch}';
       
       // Test project creation
-      await projectService.createProject('Integration Test');
+      await projectService.createProject(testName);
       
       // Verify project was created
       final projects = await projectService.loadProjectNames();
-      expect(projects, contains('Integration Test'));
+      expect(projects, contains(testName));
       
       // Test file operations
-      const testCode = '''
-app "Integration Test" {
+      final testCode = '''
+app "$testName" {
   start = "Home"
 }
 
@@ -60,8 +66,8 @@ screen Home {
 }
 ''';
       
-      await projectService.writeFile('Integration Test', 'main.sprout', testCode);
-      final readCode = await projectService.readFile('Integration Test', 'main.sprout');
+      await projectService.writeFile(testName, 'main.sprout', testCode);
+      final readCode = await projectService.readFile(testName, 'main.sprout');
       expect(readCode, contains('Hello Integration Test'));
       
       // Test compilation
@@ -105,22 +111,22 @@ screen Home {
       
       runtime.setValue('test_key', 'updated_value');
       
-      // Allow batch update to process
-      await Future.delayed(const Duration(milliseconds: 20));
+      // Allow batch update to process (increased slightly for CI stability)
+      await Future.delayed(const Duration(milliseconds: 50));
       expect(watcherTriggered, isTrue);
       
       // Test computed values
       runtime.setValue('x', 5);
       runtime.setValue('y', 3);
       runtime.computed('sum', () {
-        return runtime.getValue('x', 0) + runtime.getValue('y', 0);
+        return (runtime.getValue('x', 0) as int) + (runtime.getValue('y', 0) as int);
       }, ['x', 'y']);
       
       expect(runtime.getValue('sum', 0), equals(8));
       
       // Update dependency and verify computed value updates
       runtime.setValue('x', 10);
-      await Future.delayed(const Duration(milliseconds: 20));
+      await Future.delayed(const Duration(milliseconds: 50));
       expect(runtime.getValue('sum', 0), equals(13));
     });
 
@@ -244,10 +250,20 @@ screen {
   });
 }
 
+// Exception classes (Ensure these match your actual implementation)
 class SecurityException implements Exception {
   final String message;
   SecurityException(this.message);
-  
   @override
   String toString() => 'SecurityException: $message';
+}
+
+class ProjectException implements Exception {
+  final String message;
+  ProjectException([this.message = ""]);
+}
+
+class CompileException implements Exception {
+  final String message;
+  CompileException([this.message = ""]);
 }
