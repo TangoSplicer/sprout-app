@@ -1,0 +1,12 @@
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+      - run: flutter pub get
+        working-directory: ./flutter # Add this to EVERY flutter command
+      - run: flutter analyze
+        working-directory: ./flutter
+      - run: flutter test integration_test/integration_tests.dart
+        working-directory: ./flutter
