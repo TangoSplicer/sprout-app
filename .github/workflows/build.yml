@@ -1,0 +1,70 @@
+name: Sprout Build (V2.5.0)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest # Required for iOS
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Environment Setup
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.6'
+          cache: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios, aarch64-linux-android
+
+      # 2. Install FRB V2 Tooling
+      - name: Install FRB Tooling
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 2.5.0
+          cargo install cargo-ndk
+          brew install llvm
+
+      # 3. Generate Bridge (FRB V2 Syntax)
+      # We run this from the root. It automatically looks for a config file 
+      # or you can specify the rust-input.
+      - name: Generate Bridge
+        run: |
+          flutter_rust_bridge_codegen generate \
+            --rust-input rust/sprout_compiler/src/lib.rs \
+            --dart-output flutter/lib/src/rust/api/ \
+            --rust-output rust/sprout_compiler/src/frb_generated.rs
+        env:
+          LIBCLANG_PATH: /usr/local/opt/llvm/lib
+
+      # 4. Build Android
+      - name: Build Android APK
+        working-directory: ./flutter
+        run: flutter build apk --debug --target-platform android-arm64
+
+      # 5. Build iOS
+      - name: Build iOS
+        working-directory: ./flutter
+        run: flutter build ios --debug --no-codesign
+
+      # 6. Artifact Upload
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprout-apk
+          path: flutter/build/app/outputs/flutter-apk/app-debug.apk
+
