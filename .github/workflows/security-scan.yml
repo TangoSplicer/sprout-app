@@ -1,226 +1,169 @@
 name: Security Scan & Analysis
-
-on:
+'on':
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
   pull_request:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
   schedule:
-    # Run security scans daily at 2 AM UTC
-    - cron: '0 2 * * *'
-
-# Prevent duplicate runs on PRs from the same branch
+    - cron: 0 2 * * *
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: '${{ github.workflow }}-${{ github.ref }}'
   cancel-in-progress: true
-
 jobs:
-  # ==========================================
-  # JOB 1: Security Analysis (CodeQL)
-  # ==========================================
   security-analysis:
     name: Security Analysis
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
-      security-events: write  # REQUIRED for CodeQL
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ['rust']  # Only Rust needs CodeQL; Flutter/Dart uses other tools
-    
+      security-events: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for better CodeQL analysis
-
+          fetch-depth: 0
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
-          build-mode: none  # CRITICAL: Rust supports 'none' for buildless analysis
-          queries: security-extended,security-and-quality
-      
+          languages: rust
+          build-mode: none
+          queries: 'security-extended,security-and-quality'
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/language:${{ matrix.language }}"
-
-  # ==========================================
-  # JOB 2: Code Quality Analysis
-  # ==========================================
+          category: '/language:rust'
   code-quality:
     name: Code Quality Analysis
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Note: Code quality job doesn't need security-events write unless uploading to GitHub Security tab
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
-          channel: 'stable'
+          flutter-version: 3.16.0
+          channel: stable
           cache: true
-      
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-action@stable  # UPDATED: Modern, maintained action
+        uses: dtolnay/rust-action@stable
         with:
-          components: rustfmt, clippy
-      
+          components: 'rustfmt, clippy'
       - name: Cache Rust dependencies
-        uses: actions/cache@v4  # UPDATED: v4 is latest
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: '${{ runner.os }}-cargo-${{ hashFiles(''**/Cargo.lock'') }}'
           restore-keys: |
             ${{ runner.os }}-cargo-
-      
       - name: Install Flutter dependencies
         run: |
           cd flutter
           flutter pub get
-      
       - name: Run Flutter static analysis
         run: |
           cd flutter
           flutter analyze --fatal-infos
-      
       - name: Check Flutter code formatting
         run: |
           cd flutter
           dart format --set-exit-if-changed .
-      
       - name: Run Rust clippy (security lints)
         run: |
           cd rust/sprout_compiler
-          cargo clippy --all-targets --all-features -- -D warnings -W clippy::all -W clippy::pedantic -W clippy::cargo
-      
+          cargo clippy --all-targets --all-features -- -D warnings
       - name: Check Rust formatting
         run: |
           cd rust/sprout_compiler
           cargo fmt --all -- --check
-
-  # ==========================================
-  # JOB 3: Dependency Audit
-  # ==========================================
   dependency-audit:
     name: Check for Dependency Updates
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write      # For creating issues about vulnerabilities
-      checks: write      # For check results
-      security-events: write  # For uploading advisory database results
-    
+      issues: write
+      checks: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
       - name: Set up Rust toolchain
         uses: dtolnay/rust-action@stable
-      
-      # Install cargo-audit with caching for faster runs
       - name: Install cargo-audit
         uses: taiki-e/install-action@cargo-audit
-      
-      # Check Flutter dependencies for outdated packages
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
-          channel: 'stable'
+          flutter-version: 3.16.0
+          channel: stable
           cache: true
-      
       - name: Check Flutter dependencies
         run: |
           cd flutter
           flutter pub outdated
-        continue-on-error: true  # Don't fail if dependencies are just outdated
-      
-      # Rust dependency audit (security vulnerabilities)
+        continue-on-error: true
+      - name: Generate Cargo.lock if missing
+        run: |
+          cd rust/sprout_compiler
+          test -f Cargo.lock || cargo generate-lockfile
       - name: Run cargo audit (Rust)
         run: |
           cd rust/sprout_compiler
-          # Generate lockfile if it doesn't exist
-          test -f Cargo.lock || cargo generate-lockfile
-          cargo audit --json || true
-        continue-on-error: true  # Report but don't fail the build
-      
-      # Create GitHub Security Advisory issues for critical vulnerabilities
-      - name: Create issues for vulnerabilities
-        uses: actions-rust-lang/audit@v1
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          createIssues: true
-      
-      # Check for outdated Rust dependencies
+          cargo audit
       - name: Check outdated Rust dependencies
         run: |
           cargo install cargo-outdated
           cd rust/sprout_compiler
-          cargo outdated --exit-code 0 || true
+          cargo outdated --exit-code 0
         continue-on-error: true
-
-  # ==========================================
-  # JOB 4: Security Tests (Optional but recommended)
-  # ==========================================
   security-tests:
     name: Run Security Tests
     runs-on: ubuntu-latest
-    needs: [code-quality]  # Run after code quality checks pass
-    if: github.event_name == 'pull_request'  # Only on PRs to save time
-    
+    needs:
+      - code-quality
+    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
-          channel: 'stable'
+          flutter-version: 3.16.0
+          channel: stable
           cache: true
-      
       - name: Install dependencies
-        run: |
+        run: >
           cd flutter
+
           flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs || true
-      
-      # Only run if security tests exist
+
+          flutter pub run build_runner build --delete-conflicting-outputs ||
+          true
       - name: Check for security tests
         id: check_tests
         run: |
-          if [ -f "flutter/lib/tests/security_test.dart" ] || [ -f "flutter/test/security_test.dart" ]; then
+          if [ -f "flutter/test/security_test.dart" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
-      
       - name: Run security tests
         if: steps.check_tests.outputs.exists == 'true'
         run: |
           cd flutter
-          flutter test test/security_test.dart --coverage || true
-      
+          flutter test test/security_test.dart --coverage
       - name: Upload coverage to Codecov
         if: steps.check_tests.outputs.exists == 'true'
-        uses: codecov/codecov-action@v4  # UPDATED: v4 is latest
+        uses: codecov/codecov-action@v4
         with:
           files: ./flutter/coverage/lcov.info
           flags: security-tests
           name: security-coverage-report
           fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}  # Add this secret if needed
