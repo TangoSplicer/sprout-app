@@ -76,14 +76,20 @@ impl Parser {
             name,
             start_screen: String::new(),
             screens: Vec::new(),
+            state: Vec::new(),
         })
     }
 
-    fn parse_functions(&mut self, app: &mut App) {
-        for cap in FUNCTION_REGEX.captures_iter(&self.source) {
-            let name = cap.get(1).unwrap().as_str().to_string();
-            let params_str = cap.get(2).unwrap().as_str();
-            
+    fn parse_functions(&mut self, _app: &mut App) {
+        let capture_data: Vec<_> = FUNCTION_REGEX.captures_iter(&self.source).map(|cap| {
+            (
+                cap.get(1).unwrap().as_str().to_string(),
+                cap.get(2).unwrap().as_str().to_string(),
+                cap.get(0).unwrap().end()
+            )
+        }).collect();
+
+        for (name, params_str, end_pos) in capture_data {
             // Security: Validate function name
             if name.contains("eval") || name.contains("exec") {
                 continue; // Skip dangerous functions
@@ -96,8 +102,7 @@ impl Parser {
             };
             
             // Extract function body (simplified)
-            let start = cap.get(0).unwrap().end();
-            let body = self.source[start..].split('}').next().unwrap_or("").to_string();
+            let body = self.source[end_pos..].split('}').next().unwrap_or("").to_string();
             
             let func_def = FunctionDef {
                 name: name.clone(),
@@ -111,10 +116,11 @@ impl Parser {
 
     fn parse_screens(&mut self) -> Result<Vec<Screen>> {
         let mut screens = Vec::new();
+        let screen_names: Vec<String> = SCREEN_REGEX.captures_iter(&self.source)
+            .map(|cap| cap.get(1).unwrap().as_str().to_string())
+            .collect();
         
-        for cap in SCREEN_REGEX.captures_iter(&self.source) {
-            let name = cap.get(1).unwrap().as_str().to_string();
-            
+        for name in screen_names {
             // Security: Validate screen name
             if name.len() > 50 {
                 return Err(SproutError::Security("Screen name too long".to_string()).into());
@@ -127,10 +133,14 @@ impl Parser {
             };
             
             // Parse state variables
-            for state_cap in STATE_REGEX.captures_iter(&self.source) {
-                let var_name = state_cap.get(1).unwrap().as_str().to_string();
-                let value_str = state_cap.get(2).unwrap().as_str().to_string();
-                
+            let state_data: Vec<_> = STATE_REGEX.captures_iter(&self.source).map(|cap| {
+                (
+                    cap.get(1).unwrap().as_str().to_string(),
+                    cap.get(2).unwrap().as_str().to_string()
+                )
+            }).collect();
+
+            for (var_name, value_str) in state_data {
                 let value_type = self.parse_value(&value_str)?;
                 
                 self.variables.insert(var_name.clone(), value_type.clone());
@@ -151,16 +161,19 @@ impl Parser {
 
     fn parse_ui_elements(&mut self) -> Result<Vec<UiElement>> {
         let mut elements = Vec::new();
+        let ui_contents: Vec<String> = UI_REGEX.captures_iter(&self.source)
+            .map(|cap| cap.get(1).unwrap().as_str().to_string())
+            .collect();
         
-        for ui_cap in UI_REGEX.captures_iter(&self.source) {
-            let ui_content = ui_cap.get(1).unwrap().as_str();
-            
+        for ui_content in ui_contents {
             // Parse labels
-            for label_cap in LABEL_REGEX.captures_iter(ui_content) {
-                let text = label_cap.get(1).unwrap().as_str();
-                
+            let label_texts: Vec<String> = LABEL_REGEX.captures_iter(&ui_content)
+                .map(|cap| cap.get(1).unwrap().as_str().to_string())
+                .collect();
+
+            for text in label_texts {
                 // Security: Check for string interpolation
-                let processed_text = self.process_string_interpolation(text)?;
+                let processed_text = self.process_string_interpolation(&text)?;
                 
                 // Security: Validate label length
                 if processed_text.len() > 1000 {
@@ -173,9 +186,11 @@ impl Parser {
             }
             
             // Parse buttons
-            for button_cap in BUTTON_REGEX.captures_iter(ui_content) {
-                let label = button_cap.get(1).unwrap().as_str();
-                
+            let button_labels: Vec<String> = BUTTON_REGEX.captures_iter(&ui_content)
+                .map(|cap| cap.get(1).unwrap().as_str().to_string())
+                .collect();
+
+            for label in button_labels {
                 // Security: Validate button label
                 if label.len() > 50 {
                     return Err(SproutError::Security("Button label too long".to_string()).into());
@@ -234,22 +249,26 @@ impl Parser {
         let mut result = text.to_string();
         
         // Security: Safe string interpolation
-        for cap in STRING_INTERPOLATION.captures_iter(&text) {
-            let var_name = cap.get(1).unwrap().as_str();
-            
+        let capture_data: Vec<_> = STRING_INTERPOLATION.captures_iter(text).map(|cap| {
+            (cap.get(0).unwrap().as_str().to_string(), cap.get(1).unwrap().as_str().to_string())
+        }).collect();
+
+        for (full_match, var_name) in capture_data {
             // Security: Validate variable reference
-            if !self.variables.contains_key(var_name) {
+            if !self.variables.contains_key(&var_name) {
                 return Err(SproutError::Security(format!("Unknown variable: {}", var_name)).into());
             }
             
-            let value = match self.variables.get(var_name) {
+            let value = match self.variables.get(&var_name) {
                 Some(ValueType::String(s)) => s.clone(),
                 Some(ValueType::Number(n)) => n.to_string(),
                 Some(ValueType::Boolean(b)) => b.to_string(),
+                Some(ValueType::Array(arr)) => format!("{:?}", arr),
+                Some(ValueType::Object(obj)) => format!("{:?}", obj),
                 None => String::new(),
             };
             
-            result = result.replace(&cap[0], &value);
+            result = result.replace(&full_match, &value);
         }
         
         Ok(result)

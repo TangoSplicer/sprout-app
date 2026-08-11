@@ -71,7 +71,7 @@ pub enum Action {
     If {
         condition: String,
         then: Box<Action>,
-        else: Option<Box<Action>>,
+        r#else: Option<Box<Action>>,
     },
     Loop {
         variable: String,
@@ -300,7 +300,7 @@ impl Action {
                     }
                 }
             }
-            Action::If { condition, then, else: else_action } => {
+            Action::If { condition, then, r#else: else_action } => {
                 if condition.len() > 200 {
                     return Err("Condition too long".to_string());
                 }

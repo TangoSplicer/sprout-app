@@ -39,7 +39,7 @@ pub unsafe extern "C" fn compile_sprout_script(source: *const c_char) -> *mut c_
 /// This function is FFI-safe
 #[no_mangle]
 pub unsafe extern "C" fn parse_sprout_script(source: *const c_char) -> *mut c_char {
-    if source.is.null() {
+    if source.is_null() {
         return CString::new("{&quot;error&quot;:&quot;Source code is null&quot;}").unwrap().into_raw();
     }
 

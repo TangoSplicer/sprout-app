@@ -52,18 +52,18 @@ impl CodeGenerator {
         wasm_code.push_str("(module\n");
         
         // Generate imports
-        wasm_code.push_str("  (import &quot;env&quot; &quot;log&quot; (func $log (param i32 i32)))\n");
-        wasm_code.push_str("  (import &quot;env&quot; &quot;get_state&quot; (func $get_state (param i32) (result i32)))\n");
-        wasm_code.push_str("  (import &quot;env&quot; &quot;set_state&quot; (func $set_state (param i32 i32)))\n");
+        wasm_code.push_str("  (import \"env\" \"log\" (func $log (param i32 i32)))\n");
+        wasm_code.push_str("  (import \"env\" \"get_state\" (func $get_state (param i32) (result i32)))\n");
+        wasm_code.push_str("  (import \"env\" \"set_state\" (func $set_state (param i32 i32)))\n");
         
         // Generate memory
-        wasm_code.push_str("  (memory (export &quot;memory&quot;) 1)\n");
+        wasm_code.push_str("  (memory (export \"memory\") 1)\n");
         wasm_code.push_str("  (global $pointer (mut i32) (i32.const 0))\n");
         
         // Generate screen functions
         for (index, screen) in app.screens.iter().enumerate() {
             wasm_code.push_str(&format!(
-                "  (func $screen_{} (export &quot;render_screen_{}&quot;)\n",
+                "  (func $screen_{} (export \"render_screen_{}\")\n",
                 index, index
             ));
             
@@ -88,7 +88,7 @@ impl CodeGenerator {
         }
         
         // Generate screen table
-        wasm_code.push_str("  (table $screen_table {} funcref)\n", app.screens.len());
+        wasm_code.push_str(&format!("  (table $screen_table {} funcref)\n", app.screens.len()));
         
         wasm_code.push_str(")\n");
         
@@ -119,12 +119,12 @@ impl CodeGenerator {
                 match ui_element {
                     UiElement::Label { text } => {
                         let sanitized = self.sanitize_for_android(text)?;
-                        android_code.push_str(&format!("    Text(text = &quot;{}&quot;)\n", sanitized));
+                        android_code.push_str(&format!("    Text(text = \"{}\")\n", sanitized));
                     }
                     UiElement::Button { label, action } => {
                         let sanitized = self.sanitize_for_android(label)?;
-                        android_code.push_str(&format!("    Button(onClick = {{ /* TODO: {} */ }}) {{\n", action.to_string()));
-                        android_code.push_str(&format!("        Text(&quot;{}&quot;)\n", sanitized));
+                        android_code.push_str(&format!("    Button(onClick = {{ /* TODO: {} */ }}) {{\n", format!("{:?}", action)));
+                        android_code.push_str(&format!("        Text(\"{}\")\n", sanitized));
                         android_code.push_str("    }\n");
                     }
                     _ => {}
@@ -158,12 +158,12 @@ impl CodeGenerator {
                 match ui_element {
                     UiElement::Label { text } => {
                         let sanitized = self.sanitize_for_ios(text)?;
-                        ios_code.push_str(&format!("        Text(&quot;{}&quot;)\n", sanitized));
+                        ios_code.push_str(&format!("        Text(\"{}\")\n", sanitized));
                     }
                     UiElement::Button { label, action } => {
                         let sanitized = self.sanitize_for_ios(label)?;
-                        ios_code.push_str(&format!("        Button(action: {{ /* TODO: {} */ }}) {{\n", action.to_string()));
-                        ios_code.push_str(&format!("            Text(&quot;{}&quot;)\n", sanitized));
+                        ios_code.push_str(&format!("        Button(action: {{ /* TODO: {} */ }}) {{\n", format!("{:?}", action)));
+                        ios_code.push_str(&format!("            Text(\"{}\")\n", sanitized));
                         ios_code.push_str("        }\n");
                     }
                     _ => {}
@@ -180,20 +180,20 @@ impl CodeGenerator {
     fn generate_action_code(&self, code: &mut String, action: &Action, indent: usize) -> Result<()> {
         match action {
             Action::Navigation { target } => {
-                code.push_str(&format!("{:indent$};; Navigate to {}\n", "", indent = indent * 4, target));
+                code.push_str(&format!("{:indent$};; Navigate to {}\n", "", target, indent = indent * 4));
             }
             Action::UpdateState { variable, value } => {
-                code.push_str(&format!("{:indent$};; Update state {} = {}\n", "", indent = indent * 4, variable, value));
+                code.push_str(&format!("{:indent$};; Update state {} = {}\n", "", variable, value, indent = indent * 4));
             }
             Action::CallFunction { function, args } => {
                 // Security: Validate function call
                 if function.contains("eval") || function.contains("exec") {
                     return Err(anyhow::anyhow!("Dangerous function call detected"));
                 }
-                code.push_str(&format!("{:indent$};; Call {}({})\n", "", indent = indent * 4, function, args.join(", ")));
+                code.push_str(&format!("{:indent$};; Call {}({})\n", "", function, args.join(", "), indent = indent * 4));
             }
-            Action::If { condition, then, else: else_action } => {
-                code.push_str(&format!("{:indent$};; If {}\n", "", indent = indent * 4, condition));
+            Action::If { condition, then, r#else: else_action } => {
+                code.push_str(&format!("{:indent$};; If {}\n", "", condition, indent = indent * 4));
                 self.generate_action_code(code, then, indent + 1)?;
                 if let Some(else_act) = else_action {
                     code.push_str(&format!("{:indent$};; Else\n", "", indent = indent * 4));
@@ -201,7 +201,7 @@ impl CodeGenerator {
                 }
             }
             Action::Loop { variable, range, body } => {
-                code.push_str(&format!("{:indent$};; For {} in {}\n", "", indent = indent * 4, variable, range));
+                code.push_str(&format!("{:indent$};; For {} in {}\n", "", variable, range, indent = indent * 4));
                 // Security: Limit loop iterations
                 if body.len() > 100 {
                     return Err(anyhow::anyhow!("Loop body too large"));
@@ -218,8 +218,8 @@ impl CodeGenerator {
     fn sanitize_for_wasm(&self, text: &str) -> Result<String> {
         // Security: Sanitize text for WASM
         let sanitized = text
-            .replace("\&quot;, "\\\&quot;)
-            .replace("&quot;", "\\&quot;")
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t");
@@ -236,8 +236,8 @@ impl CodeGenerator {
         // Security: Sanitize text for Android/Kotlin
         let sanitized = text
             .replace("$", "\\$")
-            .replace("\&quot;, "\\\&quot;)
-            .replace("&quot;", "\\&quot;");
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"");
         
         // Security: Check for dangerous patterns
         if sanitized.contains("<script>") || sanitized.contains("javascript:") {
@@ -250,8 +250,8 @@ impl CodeGenerator {
     fn sanitize_for_ios(&self, text: &str) -> Result<String> {
         // Security: Sanitize text for iOS/Swift
         let sanitized = text
-            .replace("\&quot;, "\\\&quot;)
-            .replace("&quot;", "\\&quot;");
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"");
         
         // Security: Check for dangerous patterns
         if sanitized.contains("<script>") || sanitized.contains("javascript:") {
