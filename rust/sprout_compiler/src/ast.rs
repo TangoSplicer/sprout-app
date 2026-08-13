@@ -24,7 +24,7 @@ pub struct StateVariable {
     pub value: ValueType,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ValueType {
     String(String),
     Number(i64),
@@ -57,12 +57,32 @@ pub enum UiElement {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
+    /// Executes a bounded list of actions in source order.
+    Sequence {
+        actions: Vec<Action>,
+    },
+    /// Navigates to a declared screen. `Back` returns to the prior screen.
     Navigation {
         target: String,
     },
+    /// Replaces a scalar state value with a safe literal or state reference.
     UpdateState {
         variable: String,
         value: String,
+    },
+    /// Appends a resolved value to a list state variable.
+    AppendToList {
+        variable: String,
+        value: String,
+    },
+    /// Removes the first matching resolved value from a list state variable.
+    RemoveFromList {
+        variable: String,
+        value: String,
+    },
+    /// Removes the first item from a list state variable.
+    RemoveFirstFromList {
+        variable: String,
     },
     CallFunction {
         function: String,
@@ -295,17 +315,32 @@ impl UiElement {
 impl Action {
     pub fn validate(&self) -> Result<(), String> {
         match self {
+            Action::Sequence { actions } => {
+                if actions.len() > 20 {
+                    return Err("Action sequence is too large. Maximum is 20 actions".to_string());
+                }
+                for action in actions {
+                    action.validate()?;
+                }
+            }
             Action::Navigation { target } => {
                 if target.len() > 50 {
                     return Err("Navigation target too long".to_string());
                 }
             }
-            Action::UpdateState { variable, value } => {
+            Action::UpdateState { variable, value }
+            | Action::AppendToList { variable, value }
+            | Action::RemoveFromList { variable, value } => {
                 if variable.len() > 50 {
                     return Err("State variable name too long".to_string());
                 }
                 if value.len() > 500 {
                     return Err("State value too long".to_string());
+                }
+            }
+            Action::RemoveFirstFromList { variable } => {
+                if variable.len() > 50 {
+                    return Err("State variable name too long".to_string());
                 }
             }
             Action::CallFunction { function, args } => {

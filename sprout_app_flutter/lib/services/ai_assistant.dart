@@ -29,14 +29,28 @@ class AIAssistant {
 }
 
 screen Todo {
-  state rank: 1
+  state draft: ""
+  state todos: []
   ui {
     label "My ranked tasks"
-    label "1. Plan today"
-    label "2. Finish the important task"
-    label "3. Review tomorrow"
-    button "Add task"
-    button "Mark top task complete"
+    label "Add a task, then complete the first item when it is done."
+    input "Task to rank" -> draft
+    list todos
+    button "Add task" {
+      todos.append(draft)
+      draft = ""
+    }
+    button "Complete first task" {
+      todos.remove_first()
+    }
+    button "Settings" -> Settings
+  }
+}
+
+screen Settings {
+  ui {
+    label "Todo settings"
+    button "Back" { go Back }
   }
 }''';
 
@@ -61,14 +75,14 @@ screen Counter {
 screen Home {
   ui {
     label "Welcome to your app"
-    button "Open settings"
+    button "Open settings" -> Settings
   }
 }
 
 screen Settings {
   ui {
     label "Settings"
-    button "Back"
+    button "Back" { go Back }
   }
 }''';
 

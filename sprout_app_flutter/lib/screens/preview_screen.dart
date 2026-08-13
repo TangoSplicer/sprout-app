@@ -14,6 +14,7 @@ class PreviewScreen extends StatefulWidget {
 }
 
 class _PreviewScreenState extends State<PreviewScreen> {
+  final Map<String, TextEditingController> _inputControllers = {};
   SproutPreviewDocument? _document;
   String? _error;
   bool _loading = true;
@@ -48,12 +49,27 @@ class _PreviewScreenState extends State<PreviewScreen> {
   }
 
   @override
+  void dispose() {
+    for (final controller in _inputControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final document = _document;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(document?.appName ?? 'Preview'),
+        leading: document != null && document.screenName != document.startScreen
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Back',
+                onPressed: _goBack,
+              )
+            : null,
       ),
       body: SafeArea(
         child: _loading
@@ -99,67 +115,124 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Widget _buildPreview(SproutPreviewDocument document) {
     return PreviewContainer(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints:
-                  BoxConstraints(minHeight: constraints.maxHeight - 48),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    document.appName,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    document.screenName,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                  ),
-                  const SizedBox(height: 28),
-                  ...document.labels.map(
-                    (label) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  ),
-                  if (!document.hasVisibleContent)
-                    const Text(
-                      'This screen has no visible elements yet.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ...document.buttons.map(
-                    (label) => Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: FilledButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Action ready: $label')),
-                          );
-                        },
-                        child: Text(label),
-                      ),
-                    ),
-                  ),
-                ],
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Text(
+            document.appName,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            document.screenName,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+          ),
+          const SizedBox(height: 28),
+          if (!document.hasVisibleContent)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: Text(
+                'This screen has no visible elements yet.',
+                textAlign: TextAlign.center,
               ),
             ),
-          );
-        },
+          ...document.currentScreen.elements.map(_buildElement),
+        ],
       ),
     );
+  }
+
+  Widget _buildElement(SproutPreviewElement element) {
+    final document = _document!;
+    return switch (element) {
+      SproutPreviewLabel(:final text) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            document.resolveTemplate(text),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+      SproutPreviewInput(:final placeholder, :final binding) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            controller: _controllerFor(binding),
+            onChanged: (value) => document.updateInput(binding, value),
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: placeholder,
+              hintText: placeholder,
+            ),
+          ),
+        ),
+      SproutPreviewList(:final binding) => _buildList(binding),
+      SproutPreviewButton(:final label) => Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: FilledButton(
+            onPressed: () => _activate(element),
+            child: Text(label),
+          ),
+        ),
+    };
+  }
+
+  Widget _buildList(String binding) {
+    final items = _document!.listValue(binding);
+    if (items.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(
+          'No items yet. Add your first one above.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        children: [
+          for (final entry in items.indexed)
+            ListTile(
+              leading: CircleAvatar(child: Text('${entry.$1 + 1}')),
+              title: Text(entry.$2),
+            ),
+        ],
+      ),
+    );
+  }
+
+  TextEditingController _controllerFor(String binding) {
+    return _inputControllers.putIfAbsent(
+      binding,
+      () => TextEditingController(text: _document!.inputValue(binding)),
+    );
+  }
+
+  void _activate(SproutPreviewButton button) {
+    setState(() {
+      _document!.activate(button);
+      for (final entry in _inputControllers.entries) {
+        final value = _document!.inputValue(entry.key);
+        if (entry.value.text != value) entry.value.text = value;
+      }
+    });
+  }
+
+  void _goBack() {
+    setState(() {
+      _document!.activate(
+        const SproutPreviewButton('Back', [SproutPreviewNavigate('Back')]),
+      );
+    });
   }
 }

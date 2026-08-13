@@ -4,21 +4,21 @@ Sprout helps people turn small, personal needs into useful tools from their phon
 
 ## Current foundation
 
-The Android application supports local project creation, AI-generated SproutScript starters, source editing, Rust-backed validation and compilation, and a document-faithful preview of supported labels and buttons. New users can begin with a ranked todo list, counter, notes, or habit-check-in template. The **Learn Sprout** section explains the workflow from idea to preview in five short steps.
+The Android application supports local project creation, AI-generated SproutScript starters, source editing, Rust-backed validation and compilation, and a document-faithful interactive preview. New users can begin with a ranked todo list, counter, notes, or habit-check-in template. The **Learn Sprout** section explains the workflow from idea to preview in five short steps.
 
 | Capability | Current state |
 | --- | --- |
 | Personal tools | Available through templates and the AI starter flow. |
 | AI app starter | Available for ranked todos, counters, navigation, and a safe general starter. Users can inspect, accept, and save the generated source. |
 | Local compilation | Available on Android through the packaged Rust compiler libraries. |
-| Preview | Available for the compiler’s currently supported static labels and buttons. Preview explicitly reports compile failures instead of showing a misleading sample app. |
+| Preview | Available for supported labels, inputs, bounded Todo lists, state updates, and declared navigation. Preview explicitly reports compile failures instead of showing a misleading sample app. |
 | Learning | Available through onboarding lessons and the Learn Sprout home-screen route. |
 
 ## Near-term upgrades
 
-The most valuable next step is to align runtime behavior with the language users can see in preview. The compiler already validates a small, safe UI surface; the runtime should next add explicit, testable support for button actions, simple state changes, and navigation. Form inputs, ordered list data, and persistent task completion should follow only after that surface is fully specified and tested.
+The next priority is to deepen the deliberately bounded interactive surface. Inputs, list append/removal, state replacement, and screen navigation are now implemented and covered by Rust and Flutter regression tests. Future language additions should remain explicit, deterministic, and covered by parser, runtime, and preview tests before they are exposed to AI starters.
 
-The project should also add device-level integration tests that create a project, apply an AI starter, reopen the source, compile it, and preview it on arm64 Android hardware. This protects the complete path that users rely on, including Rust native-library packaging.
+The project should also add device-level integration tests that create a project, apply an AI starter, reopen the source, compile it, enter a task, complete it, and navigate between screens on arm64 Android hardware. This protects the complete path that users rely on, including Rust native-library packaging.
 
 ## Longer-term direction
 

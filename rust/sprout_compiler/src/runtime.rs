@@ -29,6 +29,8 @@ pub struct WasmRuntime {
     execution_start: Instant,
     memory_usage: usize,
     execution_log: Vec<ExecutionEvent>,
+    screens: HashMap<String, Screen>,
+    screen_stack: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +58,8 @@ impl WasmRuntime {
             execution_start: Instant::now(),
             memory_usage: 0,
             execution_log: Vec::new(),
+            screens: HashMap::new(),
+            screen_stack: Vec::new(),
         }
     }
 
@@ -64,6 +68,14 @@ impl WasmRuntime {
         self.execution_start = Instant::now();
         self.memory_usage = 0;
         self.execution_log.clear();
+        self.state.clear();
+        self.screens = app
+            .screens
+            .iter()
+            .cloned()
+            .map(|screen| (screen.name.clone(), screen))
+            .collect();
+        self.screen_stack.clear();
 
         // Security: Validate app before execution
         app.validate()
@@ -76,10 +88,10 @@ impl WasmRuntime {
         }
 
         // Find start screen
-        let screen = app
+        let screen = self
             .screens
-            .iter()
-            .find(|s| s.name == start_screen)
+            .get(start_screen)
+            .cloned()
             .ok_or_else(|| anyhow::anyhow!("Start screen not found: {}", start_screen))?;
 
         // Security: Validate screen
@@ -88,8 +100,10 @@ impl WasmRuntime {
             .map_err(|e| anyhow::anyhow!(e))
             .context("Screen validation failed")?;
 
-        // Execute screen
-        self.execute_screen(screen)?;
+        // Execute the initial screen. Button actions are dispatched only after
+        // explicit interaction, never while the screen is being loaded.
+        self.screen_stack.push(screen.name.clone());
+        self.execute_screen(&screen)?;
 
         // Security: Check execution time
         let elapsed = self.execution_start.elapsed();
@@ -139,9 +153,9 @@ impl WasmRuntime {
                 self.track_memory_usage(text.len());
             }
             UiElement::Button { label, action } => {
-                // Security: Validate and execute action
+                // Validate actions at load time, but execute them only after a
+                // user interaction through `dispatch_action`.
                 action.validate().map_err(|e| anyhow::anyhow!(e))?;
-                self.execute_action(action)?;
                 self.track_memory_usage(label.len() + 100); // Estimate button memory
             }
             UiElement::TextField {
@@ -180,16 +194,66 @@ impl WasmRuntime {
         self.log_event(ExecutionEvent::ActionExecuted(format!("{:?}", action)));
 
         match action {
-            Action::Navigation { target } => {
-                // Security: Validate navigation target
-                if target.len() > 50 {
-                    return Err(anyhow::anyhow!("Navigation target too long"));
+            Action::Sequence { actions } => {
+                for action in actions {
+                    self.execute_action(action)?;
                 }
             }
+            Action::Navigation { target } => self.navigate_to(target)?,
             Action::UpdateState { variable, value } => {
-                // Security: Evaluate value expression
                 let evaluated = self.evaluate_expression(value)?;
                 self.update_state(variable, evaluated)?;
+            }
+            Action::AppendToList { variable, value } => {
+                let evaluated = self.evaluate_expression(value)?;
+                let mut values = match self.state.get(variable) {
+                    Some(ValueType::Array(values)) => values.clone(),
+                    Some(_) => {
+                        return Err(anyhow::anyhow!(
+                            "State variable is not a list: {}",
+                            variable
+                        ))
+                    }
+                    None => Vec::new(),
+                };
+                if values.len() >= 100 {
+                    return Err(anyhow::anyhow!("List is full: {}", variable));
+                }
+                values.push(evaluated);
+                self.update_state(variable, ValueType::Array(values))?;
+            }
+            Action::RemoveFromList { variable, value } => {
+                let evaluated = self.evaluate_expression(value)?;
+                let mut values = match self.state.get(variable) {
+                    Some(ValueType::Array(values)) => values.clone(),
+                    Some(_) => {
+                        return Err(anyhow::anyhow!(
+                            "State variable is not a list: {}",
+                            variable
+                        ))
+                    }
+                    None => Vec::new(),
+                };
+                if let Some(position) = values.iter().position(|item| item == &evaluated) {
+                    values.remove(position);
+                }
+                self.update_state(variable, ValueType::Array(values))?;
+            }
+            Action::RemoveFirstFromList { variable } => {
+                let mut values = match self.state.get(variable) {
+                    Some(ValueType::Array(values)) => values.clone(),
+                    Some(_) => {
+                        return Err(anyhow::anyhow!(
+                            "State variable is not a list: {}",
+                            variable
+                        ))
+                    }
+                    None => Vec::new(),
+                };
+                if !values.is_empty() {
+                    values.remove(0);
+                }
+                self.update_state(variable, ValueType::Array(values))?;
             }
             Action::CallFunction { function, args } => {
                 // Security: Check for dangerous function calls
@@ -260,6 +324,55 @@ impl WasmRuntime {
         }
 
         Ok(())
+    }
+
+    fn navigate_to(&mut self, target: &str) -> Result<()> {
+        if target == "Back" {
+            if self.screen_stack.len() > 1 {
+                self.screen_stack.pop();
+                let previous = self
+                    .screen_stack
+                    .last()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Navigation stack is empty"))?;
+                let screen = self
+                    .screens
+                    .get(&previous)
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("Screen not found: {}", previous))?;
+                self.execute_screen(&screen)?;
+            }
+            return Ok(());
+        }
+
+        let screen = self
+            .screens
+            .get(target)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Navigation target not found: {}", target))?;
+        self.screen_stack.push(screen.name.clone());
+        self.execute_screen(&screen)
+    }
+
+    /// Dispatches an already-validated UI action after a user interaction.
+    pub fn dispatch_action(&mut self, action: &Action) -> Result<()> {
+        action.validate().map_err(|error| anyhow::anyhow!(error))?;
+        self.execute_action(action)?;
+        if self.execution_start.elapsed() > self.options.max_execution_time {
+            return Err(anyhow::anyhow!("Execution timeout"));
+        }
+        if self.memory_usage > self.options.max_memory {
+            return Err(anyhow::anyhow!("Memory limit exceeded"));
+        }
+        Ok(())
+    }
+
+    pub fn state_value(&self, name: &str) -> Option<&ValueType> {
+        self.state.get(name)
+    }
+
+    pub fn current_screen(&self) -> Option<&str> {
+        self.screen_stack.last().map(String::as_str)
     }
 
     fn update_state(&mut self, name: &str, value: ValueType) -> Result<()> {
@@ -473,5 +586,87 @@ mod tests {
         let error = execute_sprout_app(&app, "Home", None)
             .expect_err("dangerous functions must be rejected");
         assert!(format!("{error:#}").contains("Dangerous function call"));
+    }
+
+    #[test]
+    fn test_interactive_todo_mutation_and_navigation() {
+        let app = App {
+            name: "Todo".to_string(),
+            start_screen: "Todo".to_string(),
+            state: vec![],
+            screens: vec![
+                Screen {
+                    name: "Todo".to_string(),
+                    state: vec![
+                        StateVariable {
+                            name: "draft".to_string(),
+                            value: ValueType::String(String::new()),
+                        },
+                        StateVariable {
+                            name: "todos".to_string(),
+                            value: ValueType::Array(vec![]),
+                        },
+                    ],
+                    ui: vec![],
+                },
+                Screen {
+                    name: "Settings".to_string(),
+                    state: vec![],
+                    ui: vec![],
+                },
+            ],
+        };
+        let mut runtime = WasmRuntime::new(RuntimeOptions::default());
+        runtime.execute(&app, "Todo").expect("app starts");
+
+        runtime
+            .dispatch_action(&Action::UpdateState {
+                variable: "draft".to_string(),
+                value: "\"Buy milk\"".to_string(),
+            })
+            .expect("input updates draft");
+        runtime
+            .dispatch_action(&Action::Sequence {
+                actions: vec![
+                    Action::AppendToList {
+                        variable: "todos".to_string(),
+                        value: "draft".to_string(),
+                    },
+                    Action::UpdateState {
+                        variable: "draft".to_string(),
+                        value: "\"\"".to_string(),
+                    },
+                ],
+            })
+            .expect("todo is appended");
+        assert_eq!(
+            runtime.state_value("todos"),
+            Some(&ValueType::Array(vec![ValueType::String(
+                "Buy milk".to_string()
+            )]))
+        );
+
+        runtime
+            .dispatch_action(&Action::Navigation {
+                target: "Settings".to_string(),
+            })
+            .expect("settings opens");
+        assert_eq!(runtime.current_screen(), Some("Settings"));
+        runtime
+            .dispatch_action(&Action::Navigation {
+                target: "Back".to_string(),
+            })
+            .expect("back returns to todo");
+        assert_eq!(runtime.current_screen(), Some("Todo"));
+
+        runtime
+            .dispatch_action(&Action::RemoveFirstFromList {
+                variable: "todos".to_string(),
+            })
+            .expect("completed todo is removed");
+        assert_eq!(
+            runtime.state_value("todos"),
+            Some(&ValueType::Array(vec![]))
+        );
     }
 }

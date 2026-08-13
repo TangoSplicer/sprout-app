@@ -66,6 +66,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(acceptedCode, contains('app "Ranked Todo"'));
-    expect(acceptedCode, contains('1. Plan today'));
+    expect(acceptedCode, contains('input "Task to rank" -> draft'));
+    expect(acceptedCode, contains('todos.remove_first()'));
   });
 }

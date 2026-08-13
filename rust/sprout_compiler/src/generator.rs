@@ -193,6 +193,11 @@ impl CodeGenerator {
         indent: usize,
     ) -> Result<()> {
         match action {
+            Action::Sequence { actions } => {
+                for action in actions {
+                    self.generate_action_code(code, action, indent)?;
+                }
+            }
             Action::Navigation { target } => {
                 code.push_str(&format!(
                     "{:indent$};; Navigate to {}\n",
@@ -207,6 +212,32 @@ impl CodeGenerator {
                     "",
                     variable,
                     value,
+                    indent = indent * 4
+                ));
+            }
+            Action::AppendToList { variable, value } => {
+                code.push_str(&format!(
+                    "{:indent$};; Append {} to {}\n",
+                    "",
+                    value,
+                    variable,
+                    indent = indent * 4
+                ));
+            }
+            Action::RemoveFromList { variable, value } => {
+                code.push_str(&format!(
+                    "{:indent$};; Remove {} from {}\n",
+                    "",
+                    value,
+                    variable,
+                    indent = indent * 4
+                ));
+            }
+            Action::RemoveFirstFromList { variable } => {
+                code.push_str(&format!(
+                    "{:indent$};; Remove first item from {}\n",
+                    "",
+                    variable,
                     indent = indent * 4
                 ));
             }
