@@ -123,6 +123,19 @@ flutter {
     source '../..'
 }
 
+// The compiler is loaded through Dart FFI at runtime, so its shared libraries
+// must be generated and copied into src/main/jniLibs before every APK build.
+def buildSproutNativeLibraries = tasks.register('buildSproutNativeLibraries', Exec) {
+    group = 'build'
+    description = 'Builds and packages Rust Sprout compiler libraries for Android ABIs.'
+    workingDir file('../../..')
+    commandLine 'bash', file('../../../scripts/build_android_native.sh').absolutePath
+}
+
+tasks.named('preBuild').configure {
+    dependsOn(buildSproutNativeLibraries)
+}
+
 dependencies {
     // Security: Keep dependencies updated
     implementation 'androidx.core:core-ktx:1.12.0'

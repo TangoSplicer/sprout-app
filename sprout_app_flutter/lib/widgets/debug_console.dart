@@ -91,7 +91,6 @@ class _DebugConsoleState extends State<DebugConsole>
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 300,
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
@@ -126,6 +125,9 @@ class _DebugConsoleState extends State<DebugConsole>
           Expanded(
             child: TabBar(
               controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
               indicatorColor: const Color(0xFF4A9D5E),
               labelColor: Colors.white,
               unselectedLabelColor: Colors.grey.shade400,
@@ -136,7 +138,7 @@ class _DebugConsoleState extends State<DebugConsole>
                     children: [
                       const Icon(Icons.article, size: 16),
                       const SizedBox(width: 4),
-                      Text('Logs (${widget.logs.length})'),
+                      const Text('Logs'),
                     ],
                   ),
                 ),
@@ -150,7 +152,7 @@ class _DebugConsoleState extends State<DebugConsole>
                         color: widget.errors.isNotEmpty ? Colors.red : null,
                       ),
                       const SizedBox(width: 4),
-                      Text('Errors (${widget.errors.length})'),
+                      const Text('Errors'),
                     ],
                   ),
                 ),

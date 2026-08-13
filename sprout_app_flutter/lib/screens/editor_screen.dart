@@ -110,7 +110,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
           return Column(
             children: [
-              Expanded(
+              Flexible(
+                flex: _showConsole ? 3 : 1,
                 child: SyntaxEditor(
                   text: snapshot.data!,
                   onChanged: (text) async {
@@ -123,15 +124,21 @@ class _EditorScreenState extends State<EditorScreen> {
                 ),
               ),
               if (_showConsole)
-                Column(
-                  children: [
-                    const Divider(height: 1),
-                    DebugConsole(
-                      logs: _debugger.logs.map((e) => e.message).toList(),
-                      errors: _debugger.errors.map((e) => e.message).toList(),
-                      aiFeedback: _aiFeedback,
-                    ),
-                  ],
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    children: [
+                      const Divider(height: 1),
+                      Expanded(
+                        child: DebugConsole(
+                          logs: _debugger.logs.map((e) => e.message).toList(),
+                          errors:
+                              _debugger.errors.map((e) => e.message).toList(),
+                          aiFeedback: _aiFeedback,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           );
