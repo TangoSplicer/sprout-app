@@ -453,6 +453,9 @@ fn analyze_ui_permissions(ui: &ast::UiElement, permissions: &mut HashSet<String>
 
 fn analyze_action_permissions(action: &ast::Action, permissions: &mut HashSet<String>) {
     match action {
+        ast::Action::ScheduleReminder { .. } => {
+            permissions.insert("POST_NOTIFICATIONS".to_string());
+        }
         ast::Action::CallFunction { function, .. } => {
             if function.contains("camera") {
                 permissions.insert("CAMERA".to_string());
@@ -470,6 +473,11 @@ fn analyze_action_permissions(action: &ast::Action, permissions: &mut HashSet<St
         ast::Action::Loop { body, .. } => {
             for act in body {
                 analyze_action_permissions(act, permissions);
+            }
+        }
+        ast::Action::Sequence { actions } => {
+            for action in actions {
+                analyze_action_permissions(action, permissions);
             }
         }
         _ => {}

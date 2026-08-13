@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:permission_handler/permission_handler.dart';
+
+import '../services/native_bridge.dart';
 import '../services/project_service.dart';
 import '../services/sprout_preview_document.dart';
 import '../widgets/preview_container.dart';
@@ -218,14 +221,92 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  void _activate(SproutPreviewButton button) {
+  Future<void> _activate(SproutPreviewButton button) async {
+    late final List<SproutPreviewEffect> effects;
     setState(() {
-      _document!.activate(button);
+      effects = _document!.activate(button);
       for (final entry in _inputControllers.entries) {
         final value = _document!.inputValue(entry.key);
         if (entry.value.text != value) entry.value.text = value;
       }
     });
+
+    for (final effect in effects) {
+      if (effect is SproutPreviewReminderRequest) {
+        await _scheduleReminder(effect);
+      }
+    }
+  }
+
+  Future<void> _scheduleReminder(SproutPreviewReminderRequest reminder) async {
+    final message = reminder.message.trim();
+    final scheduledFor = _nextOccurrence(reminder.time);
+    if (message.isEmpty || scheduledFor == null) {
+      _showMessage(
+        'Enter a reminder and a time such as 09:00 before scheduling.',
+        error: true,
+      );
+      return;
+    }
+
+    final notificationPermission = await Permission.notification.request();
+    if (!notificationPermission.isGranted) {
+      if (mounted) {
+        _showMessage(
+          'Allow notifications to receive this reminder.',
+          error: true,
+        );
+      }
+      return;
+    }
+
+    try {
+      await NativeBridge.scheduleAlarm(
+        message,
+        scheduledFor.millisecondsSinceEpoch,
+      );
+      if (mounted) {
+        _showMessage('Reminder set for ${_formatTime(scheduledFor)}.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showMessage('This reminder could not be scheduled.', error: true);
+      }
+    }
+  }
+
+  DateTime? _nextOccurrence(String rawTime) {
+    final match =
+        RegExp(r'^(?:[01]?\d|2[0-3]):[0-5]\d$').firstMatch(rawTime.trim());
+    if (match == null) return null;
+    final parts = rawTime.trim().split(':');
+    final now = DateTime.now();
+    var scheduled = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
+    if (!scheduled.isAfter(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
+  }
+
+  String _formatTime(DateTime value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  void _showMessage(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+      ),
+    );
   }
 
   void _goBack() {

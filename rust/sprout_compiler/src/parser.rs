@@ -225,6 +225,7 @@ impl Parser {
         let append_regex = Regex::new(r"^(\w+)\.append\((.+)\)$").expect("static regex");
         let remove_regex = Regex::new(r"^(\w+)\.remove\((.+)\)$").expect("static regex");
         let remove_first_regex = Regex::new(r"^(\w+)\.remove_first\(\)$").expect("static regex");
+        let reminder_regex = Regex::new(r"^reminder\s+(.+?)\s+at\s+(.+)$").expect("static regex");
         let assignment_regex = Regex::new(r"^(\w+)\s*=\s*(.+)$").expect("static regex");
         let navigation_regex = Regex::new(r"^(?:go|navigate)\s+(\w+)$").expect("static regex");
 
@@ -268,6 +269,21 @@ impl Parser {
                         .get(1)
                         .expect("variable capture")
                         .as_str()
+                        .to_string(),
+                });
+            } else if let Some(capture) = reminder_regex.captures(statement) {
+                actions.push(Action::ScheduleReminder {
+                    message: capture
+                        .get(1)
+                        .expect("reminder message capture")
+                        .as_str()
+                        .trim()
+                        .to_string(),
+                    time: capture
+                        .get(2)
+                        .expect("reminder time capture")
+                        .as_str()
+                        .trim()
                         .to_string(),
                 });
             } else if let Some(capture) = navigation_regex.captures(statement) {
@@ -460,6 +476,26 @@ screen Settings {
             app.screens[0].ui[2],
             UiElement::Button {
                 action: Action::Sequence { .. },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn parses_bounded_reminder_action() {
+        let source = r#"app "Reminders" { start = "Home" }
+screen Home {
+  state message: "Take a break"
+  state time: "09:00"
+  ui {
+    button "Schedule" { reminder message at time }
+  }
+}"#;
+        let app = parse_sproutscript(source).expect("reminder source parses");
+        assert!(matches!(
+            app.screens[0].ui[0],
+            UiElement::Button {
+                action: Action::ScheduleReminder { .. },
                 ..
             }
         ));

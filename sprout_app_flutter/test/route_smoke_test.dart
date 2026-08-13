@@ -67,7 +67,7 @@ void main() {
 
     expect(acceptedCode, startsWith('app "'));
     expect(acceptedCode, contains('Todo'));
-    expect(acceptedCode, contains('input "Task to rank" -> draft'));
+    expect(acceptedCode, contains('input "Task to rank" -> taskDraft'));
     expect(acceptedCode, contains('.remove_first()'));
   });
 }

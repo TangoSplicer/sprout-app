@@ -84,6 +84,11 @@ pub enum Action {
     RemoveFirstFromList {
         variable: String,
     },
+    /// Requests a local reminder with a bounded message and a time expression.
+    ScheduleReminder {
+        message: String,
+        time: String,
+    },
     CallFunction {
         function: String,
         args: Vec<String>,
@@ -341,6 +346,21 @@ impl Action {
             Action::RemoveFirstFromList { variable } => {
                 if variable.len() > 50 {
                     return Err("State variable name too long".to_string());
+                }
+            }
+            Action::ScheduleReminder { message, time } => {
+                if message.is_empty() || message.len() > 500 {
+                    return Err("Reminder message must be between 1 and 500 characters".to_string());
+                }
+                if time.is_empty() || time.len() > 50 {
+                    return Err("Reminder time must be between 1 and 50 characters".to_string());
+                }
+                if message.contains("eval")
+                    || message.contains("exec")
+                    || time.contains("eval")
+                    || time.contains("exec")
+                {
+                    return Err("Reminder contains dangerous patterns".to_string());
                 }
             }
             Action::CallFunction { function, args } => {

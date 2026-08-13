@@ -14,8 +14,8 @@ void main() {
     expect(code, startsWith('app "'));
     expect(preview.appName, contains('Todo'));
     expect(preview.labels, contains('Your ranked tasks'));
-    expect(preview.buttons, contains('Add task'));
-    expect(preview.buttons, contains('Complete first task'));
+    expect(preview.buttons, contains('Add at the bottom'));
+    expect(preview.buttons, contains('Complete top task'));
   });
 
   testWidgets('syntax editor accepts a replacement document from the parent',

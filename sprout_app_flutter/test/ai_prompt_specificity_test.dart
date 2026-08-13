@@ -25,7 +25,7 @@ void main() {
     for (final source in [groceries, notes, habits]) {
       final document = SproutPreviewDocument.parse(source);
       expect(document.hasVisibleContent, isTrue);
-      expect(document.buttons, contains('Open settings'));
+      expect(document.buttons, contains('How this app works'));
     }
   });
 }

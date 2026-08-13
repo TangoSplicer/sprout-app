@@ -187,60 +187,77 @@ class _EditorScreenState extends State<EditorScreen> {
       bottomNavigationBar: SafeArea(
         top: false,
         child: BottomAppBar(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                OutlinedButton.icon(
-                  onPressed: _save,
-                  icon: const Icon(Icons.save_outlined),
-                  label: const Text('Save'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: () async {
-                    final navigator = Navigator.of(context);
-                    final previewCode = controller?.text;
-                    if (previewCode == null) return;
-                    final saved = await _save(announce: false);
-                    final compiled = saved && await _compile(announce: false);
-                    if (!mounted || !compiled) return;
-                    await navigator.push(
-                      MaterialPageRoute(
-                        builder: (_) => PreviewScreen(code: previewCode),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _save,
+                        icon: const Icon(Icons.save_outlined),
+                        label: const Text('Save'),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Preview app'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final result = await Navigator.push<String>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            AIScreen(projectName: widget.projectName),
-                      ),
-                    );
-                    if (result != null) await _applyAiCode(result);
-                  },
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text('Ask Sprout'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ShareScreen(projectName: widget.projectName),
                     ),
-                  ),
-                  icon: const Icon(Icons.ios_share),
-                  label: const Text('Share'),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          final navigator = Navigator.of(context);
+                          final previewCode = controller?.text;
+                          if (previewCode == null) return;
+                          final saved = await _save(announce: false);
+                          final compiled =
+                              saved && await _compile(announce: false);
+                          if (!mounted || !compiled) return;
+                          await navigator.push(
+                            MaterialPageRoute(
+                              builder: (_) => PreviewScreen(code: previewCode),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Preview'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.push<String>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  AIScreen(projectName: widget.projectName),
+                            ),
+                          );
+                          if (result != null) await _applyAiCode(result);
+                        },
+                        icon: const Icon(Icons.auto_awesome),
+                        label: const Text('Ask Sprout'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ShareScreen(projectName: widget.projectName),
+                          ),
+                        ),
+                        icon: const Icon(Icons.ios_share),
+                        label: const Text('Share'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -37,6 +37,7 @@ pub struct WasmRuntime {
 pub enum ExecutionEvent {
     ScreenLoaded(String),
     StateUpdated(String, ValueType),
+    ReminderRequested { message: String, time: String },
     ActionExecuted(String),
     Error(String),
 }
@@ -239,6 +240,11 @@ impl WasmRuntime {
                 }
                 self.update_state(variable, ValueType::Array(values))?;
             }
+            Action::ScheduleReminder { message, time } => {
+                let message = Self::stringify_value(&self.evaluate_expression(message)?);
+                let time = Self::stringify_value(&self.evaluate_expression(time)?);
+                self.log_event(ExecutionEvent::ReminderRequested { message, time });
+            }
             Action::RemoveFirstFromList { variable } => {
                 let mut values = match self.state.get(variable) {
                     Some(ValueType::Array(values)) => values.clone(),
@@ -410,6 +416,16 @@ impl WasmRuntime {
         self.log_event(ExecutionEvent::StateUpdated(name.to_string(), value));
 
         Ok(())
+    }
+
+    fn stringify_value(value: &ValueType) -> String {
+        match value {
+            ValueType::String(value) => value.clone(),
+            ValueType::Number(value) => value.to_string(),
+            ValueType::Boolean(value) => value.to_string(),
+            ValueType::Array(values) => format!("{values:?}"),
+            ValueType::Object(values) => format!("{values:?}"),
+        }
     }
 
     fn evaluate_expression(&self, expression: &str) -> Result<ValueType> {

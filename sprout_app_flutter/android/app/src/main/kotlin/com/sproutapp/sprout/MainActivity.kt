@@ -1,5 +1,8 @@
 package com.sproutapp.sprout
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.security.keystore.KeyGenParameterSpec
@@ -19,6 +22,7 @@ import javax.crypto.SecretKey
 
 class MainActivity: FlutterFragmentActivity() {
     private val CHANNEL = "com.sproutapp.sprout/security"
+    private val NATIVE_CHANNEL = "sprout/native"
     private lateinit var executor: Executor
     private lateinit var biometricPrompt: BiometricPrompt
     private lateinit var promptInfo: BiometricPrompt.PromptInfo
@@ -85,6 +89,44 @@ class MainActivity: FlutterFragmentActivity() {
                 }
             }
         }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NATIVE_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "scheduleAlarm" -> {
+                    val message = call.argument<String>("message")?.trim()
+                    val timestamp = call.argument<Number>("timestamp")?.toLong()
+                    if (message.isNullOrEmpty() || message.length > 500 || timestamp == null) {
+                        result.error("INVALID_ARGUMENT", "A reminder message and timestamp are required", null)
+                    } else if (timestamp <= System.currentTimeMillis()) {
+                        result.error("INVALID_ARGUMENT", "Reminder time must be in the future", null)
+                    } else {
+                        try {
+                            scheduleReminder(message, timestamp)
+                            result.success(null)
+                        } catch (error: Exception) {
+                            result.error("SCHEDULE_FAILED", error.message, null)
+                        }
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun scheduleReminder(message: String, timestamp: Long) {
+        val notificationId = (timestamp xor message.hashCode().toLong()).toInt()
+        val intent = Intent(this, ReminderReceiver::class.java).apply {
+            putExtra(ReminderReceiver.EXTRA_MESSAGE, message)
+            putExtra(ReminderReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent)
     }
 
     // Security: Check if biometric authentication is available

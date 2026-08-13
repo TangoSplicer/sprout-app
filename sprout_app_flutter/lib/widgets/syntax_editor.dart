@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_highlight/flutter_highlight.dart';
-import 'package:flutter_highlight/themes/github.dart';
-// import 'package:flutter_highlight/themes/monokai_sublime.dart';
 
 class SyntaxEditor extends StatefulWidget {
   final String text;
@@ -94,16 +91,6 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
     }
   }
 
-  Map<String, TextStyle> _getHighlightTheme() {
-    switch (widget.theme) {
-      case 'monokai':
-        return githubTheme; // Fallback for now
-      case 'github':
-      default:
-        return githubTheme;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final lineCount = _controller.text.split('\n').length;
@@ -170,45 +157,31 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
   }
 
   Widget _buildEditor() {
-    return SingleChildScrollView(
-      controller: _scrollController,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Stack(
-          children: [
-            // Syntax highlighting overlay
-            HighlightView(
-              _controller.text,
-              language: 'javascript', // Use JavaScript highlighting for now
-              theme: _getHighlightTheme(),
-              padding: EdgeInsets.zero,
-              textStyle: const TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontSize: 14,
-                height: 1.25,
-              ),
-            ),
-            // Invisible text field for input
-            TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              style: const TextStyle(
-                color: Colors.transparent,
-                fontFamily: 'JetBrainsMono',
-                fontSize: 14,
-                height: 1.25,
-              ),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-              maxLines: null,
-              readOnly: widget.readOnly,
-              onChanged: (text) => widget.onChanged(text),
-              cursorColor: Theme.of(context).primaryColor,
-              selectionControls: MaterialTextSelectionControls(),
-            ),
-          ],
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(12),
+        child: TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          keyboardType: TextInputType.multiline,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontFamily: 'monospace',
+            fontSize: 15,
+            height: 1.45,
+          ),
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+          maxLines: null,
+          minLines: 12,
+          readOnly: widget.readOnly,
+          cursorColor: Theme.of(context).colorScheme.primary,
+          selectionControls: MaterialTextSelectionControls(),
         ),
       ),
     );

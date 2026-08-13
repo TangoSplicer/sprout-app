@@ -83,10 +83,13 @@ class SproutPreviewDocument {
     _state[binding] = value.length > 1000 ? value.substring(0, 1000) : value;
   }
 
-  void activate(SproutPreviewButton button) {
+  List<SproutPreviewEffect> activate(SproutPreviewButton button) {
+    final effects = <SproutPreviewEffect>[];
     for (final action in button.actions) {
-      _runAction(action);
+      final effect = _runAction(action);
+      if (effect != null) effects.add(effect);
     }
+    return effects;
   }
 
   String resolveTemplate(String value) {
@@ -97,7 +100,7 @@ class SproutPreviewDocument {
     });
   }
 
-  void _runAction(SproutPreviewAction action) {
+  SproutPreviewEffect? _runAction(SproutPreviewAction action) {
     switch (action) {
       case SproutPreviewNavigate(:final target):
         if (target == 'Back') {
@@ -105,20 +108,30 @@ class SproutPreviewDocument {
         } else if (_screens.containsKey(target)) {
           _navigationStack.add(target);
         }
+        return null;
       case SproutPreviewUpdate(:final variable, :final expression):
         _state[variable] = _resolveExpression(expression);
+        return null;
       case SproutPreviewAppend(:final variable, :final expression):
         final values = List<String>.from(listValue(variable));
         if (values.length < 100) values.add(_resolveExpression(expression));
         _state[variable] = values;
+        return null;
       case SproutPreviewRemove(:final variable, :final expression):
         final values = List<String>.from(listValue(variable));
         values.remove(_resolveExpression(expression));
         _state[variable] = values;
+        return null;
       case SproutPreviewRemoveFirst(:final variable):
         final values = List<String>.from(listValue(variable));
         if (values.isNotEmpty) values.removeAt(0);
         _state[variable] = values;
+        return null;
+      case SproutPreviewScheduleReminder(:final message, :final time):
+        return SproutPreviewReminderRequest(
+          message: _resolveExpression(message),
+          time: _resolveExpression(time),
+        );
     }
   }
 
@@ -252,15 +265,17 @@ class SproutPreviewDocument {
     final append = RegExp(r'^(\w+)\.append\((.+)\)$');
     final remove = RegExp(r'^(\w+)\.remove\((.+)\)$');
     final removeFirst = RegExp(r'^(\w+)\.remove_first\(\)$');
+    final reminder = RegExp(r'^reminder\s+(.+?)\s+at\s+(.+)$');
     final assignment = RegExp(r'^(\w+)\s*=\s*(.+)$');
     final navigate = RegExp(r'^(?:go|navigate)\s+(\w+)$');
 
     for (final statement in source.split(RegExp(r'[\n;]'))) {
-      final value = statement.trim().replaceAll('}', '');
+      final value = statement.trim();
       if (value.isEmpty || value.startsWith('//')) continue;
       final appendMatch = append.firstMatch(value);
       final removeMatch = remove.firstMatch(value);
       final removeFirstMatch = removeFirst.firstMatch(value);
+      final reminderMatch = reminder.firstMatch(value);
       final assignmentMatch = assignment.firstMatch(value);
       final navigateMatch = navigate.firstMatch(value);
       if (appendMatch != null) {
@@ -271,6 +286,11 @@ class SproutPreviewDocument {
             SproutPreviewRemove(removeMatch.group(1)!, removeMatch.group(2)!));
       } else if (removeFirstMatch != null) {
         actions.add(SproutPreviewRemoveFirst(removeFirstMatch.group(1)!));
+      } else if (reminderMatch != null) {
+        actions.add(SproutPreviewScheduleReminder(
+          reminderMatch.group(1)!.trim(),
+          reminderMatch.group(2)!.trim(),
+        ));
       } else if (navigateMatch != null) {
         actions.add(SproutPreviewNavigate(navigateMatch.group(1)!));
       } else if (assignmentMatch != null) {
@@ -408,6 +428,25 @@ class SproutPreviewRemoveFirst extends SproutPreviewAction {
   final String variable;
 
   const SproutPreviewRemoveFirst(this.variable);
+}
+
+class SproutPreviewScheduleReminder extends SproutPreviewAction {
+  final String message;
+  final String time;
+
+  const SproutPreviewScheduleReminder(this.message, this.time);
+}
+
+sealed class SproutPreviewEffect {
+  const SproutPreviewEffect();
+}
+
+class SproutPreviewReminderRequest extends SproutPreviewEffect {
+  final String message;
+  final String time;
+
+  const SproutPreviewReminderRequest(
+      {required this.message, required this.time});
 }
 
 class _NamedBlock {

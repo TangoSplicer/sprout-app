@@ -241,6 +241,15 @@ impl CodeGenerator {
                     indent = indent * 4
                 ));
             }
+            Action::ScheduleReminder { message, time } => {
+                code.push_str(&format!(
+                    "{:indent$};; Schedule reminder {} at {}\n",
+                    "",
+                    message,
+                    time,
+                    indent = indent * 4
+                ));
+            }
             Action::CallFunction { function, args } => {
                 // Security: Validate function call
                 if function.contains("eval") || function.contains("exec") {
