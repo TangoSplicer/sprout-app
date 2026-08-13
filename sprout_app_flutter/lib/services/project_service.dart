@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import '../generated_bridge.dart' as bridge;
@@ -12,6 +14,7 @@ class ProjectService {
   late Directory _projectsDir;
   late Directory _backupsDir;
   bool _initialized = false;
+  final ValueNotifier<int> projectChanges = ValueNotifier<int>(0);
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
@@ -104,6 +107,7 @@ class ProjectService {
       // Create README
       final readmeFile = File('${projectDir.path}/README.md');
       await readmeFile.writeAsString(_getProjectReadme(name));
+      _notifyProjectChange();
     } catch (e) {
       throw ProjectException('Failed to create project: $e');
     }
@@ -183,6 +187,7 @@ class ProjectService {
         'last_modified': DateTime.now().toIso8601String(),
         'checksum': _calculateFileChecksum(content),
       });
+      _notifyProjectChange();
     } catch (e) {
       throw ProjectException('Failed to write file: $e');
     }
@@ -270,6 +275,7 @@ class ProjectService {
 
       // Delete project
       await projectDir.delete(recursive: true);
+      _notifyProjectChange();
     } catch (e) {
       throw ProjectException('Failed to delete project: $e');
     }
@@ -303,13 +309,17 @@ class ProjectService {
     }
   }
 
+  void _notifyProjectChange() {
+    projectChanges.value++;
+  }
+
   String _sanitizeName(String name) {
-    return name
+    final cleaned = name
         .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
         .replaceAll(RegExp(r'\.\.'), '')
         .replaceAll(RegExp(r'[^\w\s-]'), '')
-        .trim()
-        .substring(0, name.length > 50 ? 50 : name.length);
+        .trim();
+    return cleaned.substring(0, cleaned.length.clamp(0, 50));
   }
 
   String _sanitizeFileName(String fileName) {

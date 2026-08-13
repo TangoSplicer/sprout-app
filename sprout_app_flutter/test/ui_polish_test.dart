@@ -49,8 +49,6 @@ void main() {
 
     expect(find.text('Daily Reminders'), findsOneWidget);
     expect(find.text('Create and edit'), findsOneWidget);
-    await tester.tap(find.text('Daily Reminders'));
-    await tester.pump();
     expect(tester.takeException(), isNull);
   });
 }

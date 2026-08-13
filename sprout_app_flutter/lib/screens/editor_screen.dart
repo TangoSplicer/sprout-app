@@ -184,9 +184,11 @@ class _EditorScreenState extends State<EditorScreen> {
           );
         },
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: BottomAppBar(
+      bottomNavigationBar: Material(
+        color: Theme.of(context).bottomAppBarTheme.color,
+        elevation: Theme.of(context).bottomAppBarTheme.elevation ?? 0,
+        child: SafeArea(
+          top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
             child: Column(

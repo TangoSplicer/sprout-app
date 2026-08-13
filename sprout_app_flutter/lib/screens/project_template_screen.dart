@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/project_service.dart';
+import 'ai_screen.dart';
 import 'editor_screen.dart';
 
 class ProjectTemplate {
@@ -272,8 +273,19 @@ screen Help {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _isCreating ? null : _createProject,
-                  icon: const Icon(Icons.arrow_forward),
+                  icon: const Icon(Icons.edit_outlined),
                   label: Text(_isCreating ? 'Creating…' : 'Create and edit'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isCreating
+                      ? null
+                      : () => _createProject(openStudio: true),
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Create with Sprout Studio'),
                 ),
               ),
             ],
@@ -283,7 +295,7 @@ screen Help {
     );
   }
 
-  Future<void> _createProject() async {
+  Future<void> _createProject({bool openStudio = false}) async {
     final projectName = _nameController.text.trim();
     if (projectName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -303,7 +315,10 @@ screen Help {
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-            builder: (_) => EditorScreen(projectName: projectName)),
+          builder: (_) => openStudio
+              ? AIScreen(projectName: projectName)
+              : EditorScreen(projectName: projectName),
+        ),
       );
     } on ProjectException catch (error) {
       if (!mounted) return;

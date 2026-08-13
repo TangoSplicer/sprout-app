@@ -57,12 +57,22 @@ void main() {
     await tester.tap(find.text('Open AI'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Todo list with rankings');
-    await tester.tap(find.text('Create a tailored starter'));
+    await tester.drag(
+      find.byType(CustomScrollView),
+      const Offset(0, -560),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Create editable starter'));
     await tester.pump(const Duration(milliseconds: 600));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    expect(find.text('Your editable starter'), findsOneWidget);
-    await tester.tap(find.text('Use in my app'));
+    await tester.drag(
+      find.byType(CustomScrollView),
+      const Offset(0, -560),
+    );
+    await tester.pump();
+    expect(find.text('Editable source'), findsOneWidget);
+    await tester.tap(find.text('Use this in my app'));
     await tester.pumpAndSettle();
 
     expect(acceptedCode, startsWith('app "'));

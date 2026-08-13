@@ -20,10 +20,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    ProjectService().projectChanges.addListener(_refreshProjects);
     _projectsFuture = ProjectService().loadProjectNames();
   }
 
+  @override
+  void dispose() {
+    ProjectService().projectChanges.removeListener(_refreshProjects);
+    super.dispose();
+  }
+
   void _refreshProjects() {
+    if (!mounted) return;
     setState(() => _projectsFuture = ProjectService().loadProjectNames());
   }
 

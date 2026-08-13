@@ -252,49 +252,46 @@ class _DebugConsoleState extends State<DebugConsole>
     return Column(
       children: [
         Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.aiFeedback != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4A9D5E).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF4A9D5E)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.smart_toy,
-                          color: Color(0xFF4A9D5E),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.aiFeedback!,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    ),
+          child: ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              if (widget.aiFeedback != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A9D5E).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF4A9D5E)),
                   ),
-                  const SizedBox(height: 12),
-                ],
-                const Text(
-                  'Available Commands:',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.auto_awesome,
+                        color: Color(0xFF72C68C),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.aiFeedback!,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                ..._getAvailableCommands().map(_buildCommandHelp),
+                const SizedBox(height: 16),
               ],
-            ),
+              const Text(
+                'Available commands',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ..._getAvailableCommands().map(_buildCommandHelp),
+            ],
           ),
         ),
         _buildCommandInput(),
