@@ -1,8 +1,6 @@
-// flutter/lib/screens/project_template_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/app_state.dart';
-import '../services/enhanced_ai_assistant.dart';
+
+import '../services/project_service.dart';
 import 'editor_screen.dart';
 
 class ProjectTemplate {
@@ -12,7 +10,7 @@ class ProjectTemplate {
   final IconData icon;
   final Color color;
 
-  ProjectTemplate({
+  const ProjectTemplate({
     required this.name,
     required this.description,
     required this.code,
@@ -30,276 +28,232 @@ class ProjectTemplateScreen extends StatefulWidget {
 
 class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
   final TextEditingController _nameController =
-      TextEditingController(text: 'My App');
-  final List<ProjectTemplate> _templates = [];
+      TextEditingController(text: 'My Sprout App');
   int _selectedTemplateIndex = 0;
   bool _isCreating = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadTemplates();
-  }
-
-  void _loadTemplates() {
-    // Convert AI templates to project templates
-    final aiAssistant = EnhancedAIAssistant();
-    final aiTemplates = aiAssistant.getTemplates();
-
-    // Define template colors and icons
-    final colors = [
-      const Color(0xFF4A9D5E), // Green
-      const Color(0xFF3F51B5), // Indigo
-      const Color(0xFFF44336), // Red
-      const Color(0xFF009688), // Teal
-      const Color(0xFFFF9800), // Orange
-    ];
-
-    final icons = [
-      Icons.check_box_outlined,
-      Icons.calculate_outlined,
-      Icons.note_outlined,
-      Icons.favorite_outline,
-      Icons.calendar_today_outlined,
-    ];
-
-    // Create project templates from AI templates
-    for (var i = 0; i < aiTemplates.length; i++) {
-      final template = aiTemplates[i];
-      _templates.add(
-        ProjectTemplate(
-          name: template.name,
-          description: template.description,
-          code: template.code
-              .replaceAll('{{title}}', _nameController.text)
-              .replaceAll('{{appName}}', _nameController.text),
-          icon: icons[i % icons.length],
-          color: colors[i % colors.length],
-        ),
-      );
-    }
-
-    // Add blank template
-    _templates.add(
-      ProjectTemplate(
-        name: 'Blank Project',
-        description: 'Start with a clean slate',
-        code: '''app "${_nameController.text}" {
-  start = Home
+  static const _templates = [
+    ProjectTemplate(
+      name: 'Ranked Todo',
+      description: 'Plan the most important tasks first.',
+      icon: Icons.format_list_numbered,
+      color: Color(0xFF167A4A),
+      code: '''app "{{appName}}" {
+  start = "Todo"
 }
 
-screen Home {
+screen Todo {
   ui {
-    column {
-      title("Welcome to ${_nameController.text}")
-      label("Start building your app here")
-    }
+    label "My ranked tasks"
+    label "1. Plan today"
+    label "2. Finish the important task"
+    label "3. Review tomorrow"
+    button "Add task"
+    button "Mark top task complete"
   }
 }''',
-        icon: Icons.add_circle_outline,
-        color: Colors.grey.shade700,
-      ),
-    );
+    ),
+    ProjectTemplate(
+      name: 'Counter',
+      description: 'A small tally for anything you track.',
+      icon: Icons.exposure_plus_1_outlined,
+      color: Color(0xFF4169A8),
+      code: '''app "{{appName}}" {
+  start = "Counter"
+}
 
-    setState(() {});
+screen Counter {
+  state count: 0
+  ui {
+    label "Keep count"
+    label "Start at zero and make it yours."
+    button "Increase"
+    button "Reset"
   }
+}''',
+    ),
+    ProjectTemplate(
+      name: 'Quick Notes',
+      description: 'Capture thoughts in one focused place.',
+      icon: Icons.sticky_note_2_outlined,
+      color: Color(0xFF9B5A2E),
+      code: '''app "{{appName}}" {
+  start = "Notes"
+}
+
+screen Notes {
+  ui {
+    label "Quick notes"
+    label "Keep the next important thought close."
+    button "Add a note"
+    button "Review notes"
+  }
+}''',
+    ),
+    ProjectTemplate(
+      name: 'Habit Check-in',
+      description: 'A calm daily check-in for one routine.',
+      icon: Icons.favorite_outline,
+      color: Color(0xFFB04772),
+      code: '''app "{{appName}}" {
+  start = "Habit"
+}
+
+screen Habit {
+  ui {
+    label "Today’s habit"
+    label "One small action is enough."
+    button "Mark complete"
+    button "See my progress"
+  }
+}''',
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('New Project'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Project name input
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Project Name',
-                hintText: 'Enter a name for your project',
+      appBar: AppBar(title: const Text('Start with a template')),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose a simple starting point',
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w800),
               ),
-              onChanged: (value) {
-                // Update template code with new name
-                setState(() {
-                  for (var i = 0; i < _templates.length; i++) {
-                    final template = _templates[i];
-                    if (template.name == 'Blank Project') {
-                      _templates[i] = ProjectTemplate(
-                        name: template.name,
-                        description: template.description,
-                        code: '''app "$value" {
-  start = Home
-}
-
-screen Home {
-  ui {
-    column {
-      title("Welcome to $value")
-      label("Start building your app here")
-    }
-  }
-}''',
-                        icon: template.icon,
-                        color: template.color,
-                      );
-                    }
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-
-            const Text(
-              'Choose a template:',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 6),
+              Text(
+                'You can adjust every label and action after it opens.',
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Template grid
-            Expanded(
-              child: _templates.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.8,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
+              const SizedBox(height: 20),
+              TextField(
+                controller: _nameController,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'App name',
+                  hintText: 'e.g. Weekly Tasks',
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final columns = constraints.maxWidth >= 600 ? 3 : 2;
+                    return GridView.builder(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        childAspectRatio: 0.9,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
                       ),
                       itemCount: _templates.length,
                       itemBuilder: (context, index) {
                         final template = _templates[index];
-                        final isSelected = _selectedTemplateIndex == index;
-
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedTemplateIndex = index;
-                            });
-                          },
-                          child: Card(
-                            elevation: isSelected ? 4 : 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: isSelected
-                                  ? BorderSide(color: template.color, width: 2)
-                                  : BorderSide.none,
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    template.icon,
-                                    size: 48,
-                                    color: template.color,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    template.name,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    template.description,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                        final selected = _selectedTemplateIndex == index;
+                        return Semantics(
+                          selected: selected,
+                          button: true,
+                          label: '${template.name} template',
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () =>
+                                setState(() => _selectedTemplateIndex = index),
+                            child: Card(
+                              color: selected
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(template.icon,
+                                        color: template.color, size: 32),
+                                    const Spacer(),
+                                    Text(template.name,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 6),
+                                    Text(template.description,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         );
                       },
-                    ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Create button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.create),
-                label: Text(_isCreating ? 'Creating...' : 'Create Project'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                    );
+                  },
                 ),
-                onPressed: _isCreating ? null : _createProject,
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _isCreating ? null : _createProject,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: Text(_isCreating ? 'Creating…' : 'Create and edit'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Future<void> _createProject() async {
-    if (_nameController.text.trim().isEmpty) {
+    final projectName = _nameController.text.trim();
+    if (projectName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a project name')),
+        const SnackBar(content: Text('Give your app a name first.')),
       );
       return;
     }
 
-    setState(() {
-      _isCreating = true;
-    });
-
+    setState(() => _isCreating = true);
     try {
-      final appState = Provider.of<AppState>(context, listen: false);
-      final projectName = _nameController.text.trim();
       final template = _templates[_selectedTemplateIndex];
-
-      // Create the project
-      await appState.createProject(projectName);
-
-      // Save the template code
-      await appState.saveCode(template.code
-          .replaceAll('{{title}}', projectName)
-          .replaceAll('{{appName}}', projectName));
-
-      if (mounted) {
-        // Navigate to the editor
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => EditorScreen(projectName: projectName),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating project: $e')),
-        );
-      }
+      final code = template.code.replaceAll('{{appName}}', projectName);
+      final projects = ProjectService();
+      await projects.createProject(projectName);
+      await projects.writeFile(projectName, 'main.sprout', code);
+      if (!mounted) return;
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (_) => EditorScreen(projectName: projectName)),
+      );
+    } on ProjectException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not create this app. Please try again.')),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isCreating = false;
-        });
-      }
+      if (mounted) setState(() => _isCreating = false);
     }
   }
 

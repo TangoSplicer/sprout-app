@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../services/e2ee.dart';
 import '../services/project_service.dart';
 import 'home_screen.dart';
-import 'ai_screen.dart';
+import 'editor_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -172,17 +172,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   const Text('Try: "A counter app"',
                       style: TextStyle(fontStyle: FontStyle.italic)),
                   const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const AIScreen(projectName: 'Counter'),
-                        ),
-                      );
-                    },
-                    child: const Text('Try It'),
+                  FilledButton.icon(
+                    onPressed: _openAiStarter,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Open a guided starter'),
                   ),
                 ],
               ),
@@ -223,6 +216,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             onTap: () => _createTemplateProject('Counter'),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _openAiStarter() async {
+    const projectName = 'My First Sprout App';
+    try {
+      await ProjectService().createProject(projectName);
+    } on ProjectException {
+      // Reuse the existing guided project if the user revisits onboarding.
+    }
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const EditorScreen(projectName: projectName),
       ),
     );
   }
@@ -269,37 +279,105 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildEditorTour() {
-    return Container(
-      color: Colors.white,
-      child: const Center(
-        child: Text('Editor Tour (3-step overlay)'),
-      ),
+    return _buildLessonStep(
+      icon: Icons.code_outlined,
+      title: 'Make one small change at a time',
+      description:
+          'Your editor holds the source for this app. Use the AI button for a starter, then keep the parts you like and change the rest.',
+      tips: const [
+        'Use the save button after a manual edit.',
+        'Open the console if you need to understand a compile message.',
+        'A short description creates a clearer AI starter.',
+      ],
     );
   }
 
   Widget _buildFirstRun() {
-    return Container(
-      color: Colors.white,
-      child: const Center(
-        child: Text('Preview & Install Flow'),
-      ),
+    return _buildLessonStep(
+      icon: Icons.play_circle_outline,
+      title: 'Preview before you depend on it',
+      description:
+          'Tap Run to compile your current source and see the labels and actions that it creates. Return to the editor whenever you want to refine it.',
+      tips: const [
+        'Preview never changes your saved app by itself.',
+        'If a preview fails, read the message and adjust the source.',
+        'Start with one useful screen, then add more later.',
+      ],
     );
   }
 
   Widget _buildShare() {
-    return Container(
-      color: Colors.white,
-      child: const Center(
-        child: Text('QR Share Screen'),
-      ),
+    return _buildLessonStep(
+      icon: Icons.share_outlined,
+      title: 'Share only when you are ready',
+      description:
+          'Your projects stay on your device. When you choose to share, make sure the receiving person knows what the app is for and how it uses their data.',
+      tips: const [
+        'Give your app a clear name before sharing it.',
+        'Preview it once more before sending a copy.',
+        'Keep your recovery phrase private.',
+      ],
     );
   }
 
   Widget _buildComplete() {
-    return Container(
-      color: Colors.white,
-      child: const Center(
-        child: Text('Onboarding Complete!'),
+    return _buildLessonStep(
+      icon: Icons.eco_outlined,
+      title: 'You are ready to grow your first tool',
+      description:
+          'You do not need to learn everything today. Pick one small task, create a starter, and improve it whenever you have a new idea.',
+      tips: const [
+        'Try a ranked todo list for your first project.',
+        'Use Learn Sprout from the home screen whenever you need a refresher.',
+      ],
+    );
+  }
+
+  Widget _buildLessonStep({
+    required IconData icon,
+    required String title,
+    required String description,
+    required List<String> tips,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 30,
+              backgroundColor: scheme.primaryContainer,
+              foregroundColor: scheme.primary,
+              child: Icon(icon, size: 32),
+            ),
+            const SizedBox(height: 24),
+            Text(title,
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 12),
+            Text(description, style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 24),
+            ...tips.map(
+              (tip) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.check_circle_outline,
+                        size: 20, color: scheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(tip)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

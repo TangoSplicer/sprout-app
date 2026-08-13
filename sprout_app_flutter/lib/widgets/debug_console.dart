@@ -132,13 +132,13 @@ class _DebugConsoleState extends State<DebugConsole>
               labelColor: Colors.white,
               unselectedLabelColor: Colors.grey.shade400,
               tabs: [
-                Tab(
+                const Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.article, size: 16),
-                      const SizedBox(width: 4),
-                      const Text('Logs'),
+                      Icon(Icons.article, size: 16),
+                      SizedBox(width: 4),
+                      Text('Logs'),
                     ],
                   ),
                 ),

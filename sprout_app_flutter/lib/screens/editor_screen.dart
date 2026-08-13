@@ -113,7 +113,7 @@ class _EditorScreenState extends State<EditorScreen> {
               Flexible(
                 flex: _showConsole ? 3 : 1,
                 child: SyntaxEditor(
-                  text: snapshot.data!,
+                  text: _controller.text,
                   onChanged: (text) async {
                     _controller.value = TextEditingValue(
                       text: text,
@@ -180,10 +180,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       builder: (_) => AIScreen(projectName: widget.projectName),
                     ),
                   );
-                  if (result != null && mounted) {
-                    _controller.text = result;
-                    _setAiFeedback("AI code inserted");
-                    await _ls.notifyChange(result);
+                  if (result != null) {
+                    await _applyAiCode(result);
                   }
                 },
               ),
@@ -209,6 +207,29 @@ class _EditorScreenState extends State<EditorScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _applyAiCode(String code) async {
+    _controller.value = TextEditingValue(
+      text: code,
+      selection: TextSelection.collapsed(offset: code.length),
+    );
+
+    try {
+      await ProjectService().writeFile(widget.projectName, 'main.sprout', code);
+      await _ls.notifyChange(code);
+      if (!mounted) return;
+      _setAiFeedback('AI app applied and saved');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your generated app is now active.')),
+      );
+    } catch (error, stack) {
+      _debugger.error('Could not save AI code: $error', stack: stack);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save the generated app.')),
+      );
+    }
   }
 
   void _setAiFeedback(String feedback) {

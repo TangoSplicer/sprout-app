@@ -1,77 +1,86 @@
-// flutter/lib/services/ai_assistant.dart
-
 class AIAssistant {
   static final AIAssistant _instance = AIAssistant._internal();
+
   factory AIAssistant() => _instance;
+
   AIAssistant._internal();
 
   Future<String> generate(String prompt) async {
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    prompt = prompt.toLowerCase();
-
-    if (prompt.contains('todo') || prompt.contains('to-do')) {
-      return '''screen TodoList {
-  state todos = []
-
-  ui {
-    list(todos) {
-      button("Done") { todos.remove(item) }
+    final normalizedPrompt = prompt.toLowerCase();
+    if (normalizedPrompt.contains('todo') ||
+        normalizedPrompt.contains('to-do')) {
+      return _rankedTodoTemplate;
     }
-    button("Add") -> AddTodo
+    if (normalizedPrompt.contains('counter')) {
+      return _counterTemplate;
+    }
+    if (normalizedPrompt.contains('navigate') ||
+        normalizedPrompt.contains('go to')) {
+      return _navigationTemplate;
+    }
+
+    return _starterTemplate;
   }
+
+  static const String _rankedTodoTemplate = '''app "Ranked Todo" {
+  start = "Todo"
 }
 
-screen AddTodo {
-  state input = ""
+screen Todo {
+  state rank: 1
   ui {
-    input("New item", text: input)
-    button("Save") {
-      if input != "" {
-        todos.add(input)
-        input = ""
-      }
-      go Back
-    }
+    label "My ranked tasks"
+    label "1. Plan today"
+    label "2. Finish the important task"
+    label "3. Review tomorrow"
+    button "Add task"
+    button "Mark top task complete"
   }
 }''';
-    }
 
-    if (prompt.contains('counter')) {
-      return '''screen Counter {
-  state count = 0
+  static const String _counterTemplate = '''app "Counter" {
+  start = "Counter"
+}
+
+screen Counter {
+  state count: 0
   ui {
-    column {
-      title("Counter")
-      label("\${count}")
-      button("++") { count = count + 1 }
-      button("--") { count = count - 1 }
-    }
+    label "Counter"
+    label "Current count: \${count}"
+    button "Increase"
+    button "Decrease"
   }
 }''';
-    }
 
-    if (prompt.contains('navigate') || prompt.contains('go to')) {
-      return '''screen Home {
+  static const String _navigationTemplate = '''app "Simple Navigator" {
+  start = "Home"
+}
+
+screen Home {
   ui {
-    label("Welcome!")
-    button("Open Settings") -> Settings
+    label "Welcome to your app"
+    button "Open settings"
   }
 }
 
 screen Settings {
   ui {
-    label("This is the settings screen")
-    button("Back") -> Back
+    label "Settings"
+    button "Back"
   }
 }''';
-    }
 
-    return '''// Try: "todo", "counter", or "navigate"
-screen Help {
+  static const String _starterTemplate = '''app "My Sprout App" {
+  start = "Home"
+}
+
+screen Home {
   ui {
-    label("Describe what you want.")
+    label "Your new app is ready"
+    label "Describe a todo list, counter, or navigation app for a tailored starter."
+    button "Get started"
   }
 }''';
-  }
 }

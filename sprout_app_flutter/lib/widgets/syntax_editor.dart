@@ -48,6 +48,18 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
   }
 
   @override
+  void didUpdateWidget(covariant SyntaxEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.text != oldWidget.text && widget.text != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.text,
+        selection: TextSelection.collapsed(offset: widget.text.length),
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();

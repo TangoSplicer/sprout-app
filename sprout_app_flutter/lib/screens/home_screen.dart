@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'editor_screen.dart';
 import 'settings_screen.dart';
+import 'learning_screen.dart';
+import 'project_template_screen.dart';
 import '../services/project_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -39,6 +41,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.school_outlined),
+            tooltip: 'Learn Sprout',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LearningScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -104,53 +116,29 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4A9D5E),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
+              child: FilledButton.icon(
                 icon: const Icon(Icons.add, size: 20),
                 label: const Text('New App'),
-                onPressed: () => _createNewApp(context),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProjectTemplateScreen(),
+                    ),
+                  ).then((_) {
+                    if (mounted) {
+                      setState(() {
+                        _projectsFuture = ProjectService().loadProjectNames();
+                      });
+                    }
+                  });
+                },
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  void _createNewApp(BuildContext context) async {
-    final controller = TextEditingController(text: 'My App');
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('New App'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(labelText: 'App Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4A9D5E)),
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null) {
-      await ProjectService().createProject(result);
-      setState(() {
-        _projectsFuture = ProjectService().loadProjectNames();
-      });
-    }
   }
 }
 
