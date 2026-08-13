@@ -19,7 +19,7 @@ class SproutApp extends StatelessWidget {
         colorScheme: const ColorScheme.light(
           primary: Color(0xFF4A9D5E),
           secondary: Color(0xFFFFC107),
-          background: Color(0xFFF8F9FA),
+          surface: Color(0xFFF8F9FA),
         ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,

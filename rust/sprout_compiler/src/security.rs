@@ -1,14 +1,18 @@
 use crate::ast::*;
+use serde::Serialize;
 use std::collections::HashSet;
 use thiserror::Error;
-use serde::Serialize;
 
 #[derive(Debug, Error)]
 pub enum SecurityError {
     #[error("Dangerous function call: {function}")]
     DangerousFunction { function: String },
     #[error("Resource limit exceeded: {resource} ({current} > {limit})")]
-    ResourceLimit { resource: String, current: usize, limit: usize },
+    ResourceLimit {
+        resource: String,
+        current: usize,
+        limit: usize,
+    },
     #[error("Code complexity too high: {complexity}")]
     ComplexityLimit { complexity: usize },
     #[error("Unsafe data access: {details}")]
@@ -44,7 +48,7 @@ impl Default for SecurityAnalyzer {
         blocked_functions.insert("eval".to_string());
         blocked_functions.insert("exec".to_string());
         blocked_functions.insert("system".to_string());
-        
+
         Self {
             blocked_functions,
             resource_limits: ResourceLimits::default(),
@@ -56,7 +60,7 @@ impl Default for SecurityAnalyzer {
 impl SecurityAnalyzer {
     pub fn analyze_app(&self, app: &App) -> Result<SecurityReport, SecurityError> {
         let mut report = SecurityReport::default();
-        
+
         // Check screen count
         if app.screens.len() > self.resource_limits.max_screens {
             return Err(SecurityError::ResourceLimit {
@@ -65,25 +69,33 @@ impl SecurityAnalyzer {
                 limit: self.resource_limits.max_screens,
             });
         }
-        
+
         for screen in &app.screens {
             self.analyze_screen(screen, &mut report)?;
         }
-        
+
         report.complexity_score = self.calculate_complexity(app);
         report.risk_level = self.calculate_risk_level(&report);
-        
+
         Ok(report)
     }
-    
-    fn analyze_screen(&self, screen: &Screen, report: &mut SecurityReport) -> Result<(), SecurityError> {
+
+    fn analyze_screen(
+        &self,
+        screen: &Screen,
+        report: &mut SecurityReport,
+    ) -> Result<(), SecurityError> {
         for ui_element in &screen.ui {
             self.analyze_ui_element(ui_element, report)?;
         }
         Ok(())
     }
-    
-    fn analyze_ui_element(&self, ui: &UiElement, report: &mut SecurityReport) -> Result<(), SecurityError> {
+
+    fn analyze_ui_element(
+        &self,
+        ui: &UiElement,
+        report: &mut SecurityReport,
+    ) -> Result<(), SecurityError> {
         match ui {
             UiElement::Label { text } => {
                 if text.contains("<script") {
@@ -99,8 +111,12 @@ impl SecurityAnalyzer {
         }
         Ok(())
     }
-    
-    fn analyze_action(&self, action: &Action, report: &mut SecurityReport) -> Result<(), SecurityError> {
+
+    fn analyze_action(
+        &self,
+        action: &Action,
+        report: &mut SecurityReport,
+    ) -> Result<(), SecurityError> {
         match action {
             Action::CallFunction { function, .. } => {
                 if self.blocked_functions.contains(function) {
@@ -125,11 +141,11 @@ impl SecurityAnalyzer {
         }
         Ok(())
     }
-    
+
     fn calculate_complexity(&self, app: &App) -> usize {
         app.screens.len() + app.state.len()
     }
-    
+
     fn calculate_risk_level(&self, report: &SecurityReport) -> RiskLevel {
         if !report.security_warnings.is_empty() {
             RiskLevel::High

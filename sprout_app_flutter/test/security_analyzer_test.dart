@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sprout/services/security_analyzer.dart';
+import 'package:sprout_app/services/security_analyzer.dart';
 
 void main() {
   group('SecurityAnalyzer Tests', () {
@@ -10,7 +10,7 @@ void main() {
     });
 
     test('Detects eval() usage', () {
-      final code = '''
+      const code = '''
         function test() {
           var result = eval(userInput);
           return result;
@@ -28,7 +28,7 @@ void main() {
     });
 
     test('Detects innerHTML assignment', () {
-      final code = '''
+      const code = '''
         element.innerHTML = userInput;
       ''';
 
@@ -42,21 +42,22 @@ void main() {
     });
 
     test('Detects hardcoded passwords', () {
-      final code = '''
+      const code = '''
         const password = "hardcoded_password_123";
       ''';
 
       final report = analyzer.analyzeCode(code, 'test.js');
 
       expect(
-        report.issues.any((issue) => issue.title.contains('Hardcoded password')),
+        report.issues
+            .any((issue) => issue.title.contains('Hardcoded password')),
         isTrue,
       );
       expect(report.criticalIssues, greaterThan(0));
     });
 
     test('Detects hardcoded API keys', () {
-      final code = '''
+      const code = '''
         const apiKey = "sk-1234567890abcdef";
       ''';
 
@@ -70,35 +71,33 @@ void main() {
     });
 
     test('Detects insecure HTTP connections', () {
-      final code = '''
+      const code = '''
         fetch('http://example.com/data');
       ''';
 
       final report = analyzer.analyzeCode(code, 'test.js');
 
-      final httpIssues = report.issues.where(
-        (issue) => issue.title.contains('HTTP') && issue.severity == 'medium'
-      );
+      final httpIssues = report.issues.where((issue) =>
+          issue.title.contains('HTTP') && issue.severity == 'medium');
 
       expect(httpIssues.length, greaterThan(0));
     });
 
     test('Allows secure HTTPS connections', () {
-      final code = '''
+      const code = '''
         fetch('https://example.com/data');
       ''';
 
       final report = analyzer.analyzeCode(code, 'test.js');
 
-      final httpIssues = report.issues.where(
-        (issue) => issue.title.contains('HTTP')
-      );
+      final httpIssues =
+          report.issues.where((issue) => issue.title.contains('HTTP'));
 
       expect(httpIssues.length, equals(0));
     });
 
     test('Detects localStorage usage', () {
-      final code = '''
+      const code = '''
         localStorage.setItem('token', userToken);
       ''';
 
@@ -112,7 +111,7 @@ void main() {
     });
 
     test('Calculates code quality score correctly', () {
-      final safeCode = '''
+      const safeCode = '''
         function greet(name) {
           return "Hello, " + name;
         }
@@ -121,7 +120,7 @@ void main() {
       final safeReport = analyzer.analyzeCode(safeCode, 'safe.js');
       expect(safeReport.codeQualityScore, equals(100));
 
-      final unsafeCode = '''
+      const unsafeCode = '''
         eval(userInput);
         localStorage.setItem('key', 'value');
         document.write(content);
@@ -133,22 +132,21 @@ void main() {
     });
 
     test('Detects script injection attempts', () {
-      final code = '''
+      const code = '''
         const content = "<script>alert('XSS')</script>";
       ''';
 
       final report = analyzer.analyzeCode(code, 'test.js');
 
       expect(
-        report.issues.any((issue) => 
-          issue.title.contains('innerHTML') || issue.severity == 'high'
-        ),
+        report.issues.any((issue) =>
+            issue.title.contains('innerHTML') || issue.severity == 'high'),
         isTrue,
       );
     });
 
     test('Generates consistent code hash', () {
-      final code = 'function test() { return "hello"; }';
+      const code = 'function test() { return "hello"; }';
 
       final hash1 = analyzer.generateCodeHash(code);
       final hash2 = analyzer.generateCodeHash(code);
@@ -158,8 +156,8 @@ void main() {
     });
 
     test('Compares reports correctly', () {
-      final code1 = 'eval(userInput);';
-      final code2 = 'localStorage.setItem("key", "value");';
+      const code1 = 'eval(userInput);';
+      const code2 = 'localStorage.setItem("key", "value");';
 
       final report1 = analyzer.analyzeCode(code1, 'test1.js');
       final report2 = analyzer.analyzeCode(code2, 'test2.js');
@@ -173,7 +171,7 @@ void main() {
     });
 
     test('Detects document.write usage', () {
-      final code = '''
+      const code = '''
         document.write('<h1>Hello</h1>');
       ''';
 
@@ -186,7 +184,7 @@ void main() {
     });
 
     test('Detects multiple security issues', () {
-      final code = '''
+      const code = '''
         function dangerous() {
           eval(userInput);
           document.write(content);
@@ -204,7 +202,7 @@ void main() {
     });
 
     test('Handles empty code', () {
-      final code = '';
+      const code = '';
 
       final report = analyzer.analyzeCode(code, 'empty.js');
 
@@ -213,7 +211,7 @@ void main() {
     });
 
     test('Includes line numbers in issues', () {
-      final code = '''
+      const code = '''
         line 1
         line 2
         eval(userInput);
@@ -231,7 +229,7 @@ void main() {
     });
 
     test('Provides recommendations', () {
-      final code = 'eval(userInput);';
+      const code = 'eval(userInput);';
 
       final report = analyzer.analyzeCode(code, 'test.js');
 

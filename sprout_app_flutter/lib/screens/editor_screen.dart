@@ -1,11 +1,9 @@
 // flutter/lib/screens/editor_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'preview_screen.dart';
 import 'ai_screen.dart';
 import 'share_screen.dart';
 import '../services/project_service.dart';
-import '../services/reactive_runtime.dart';
 import '../widgets/debug_console.dart';
 import '../widgets/syntax_editor.dart';
 import '../services/language_server.dart';
@@ -66,7 +64,8 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _save() async {
     try {
-      await ProjectService().writeFile(widget.projectName, 'main.sprout', _controller.text);
+      await ProjectService()
+          .writeFile(widget.projectName, 'main.sprout', _controller.text);
       _debugger.log("Saved to project");
       await _ls.notifyChange(_controller.text); // Update language server
     } catch (e, stack) {
@@ -153,6 +152,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 tooltip: 'Run',
                 onPressed: () async {
                   await _compile();
+                  if (!context.mounted) return;
                   if (_debugger.errors.isEmpty) {
                     Navigator.push(
                       context,

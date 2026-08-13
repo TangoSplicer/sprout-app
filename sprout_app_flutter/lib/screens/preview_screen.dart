@@ -52,7 +52,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   children: [
                     const Text('Tap to grow', style: TextStyle(fontSize: 20)),
                     const SizedBox(height: 16),
-                    Text('${rt.getValue('count', 0)}', style: const TextStyle(fontSize: 48)),
+                    Text('${rt.getValue('count', 0)}',
+                        style: const TextStyle(fontSize: 48)),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {

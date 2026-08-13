@@ -1,5 +1,4 @@
 // flutter/lib/services/ai_assistant.dart
-import 'dart:convert';
 
 class AIAssistant {
   static final AIAssistant _instance = AIAssistant._internal();

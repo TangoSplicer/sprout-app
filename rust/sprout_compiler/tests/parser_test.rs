@@ -1,7 +1,7 @@
 // rust/sprout_compiler/tests/parser_test.rs
 #[cfg(test)]
 mod tests {
-    use super::parser::parse;
+    use sprout_compiler::parser::Parser;
 
     #[test]
     fn test_parse_app() {
@@ -13,7 +13,7 @@ mod tests {
               ui { label("Hi") }
             }
         "#;
-        let result = parse(source);
+        let result = Parser::new(source).parse();
         assert!(result.is_ok());
     }
 }

@@ -43,7 +43,8 @@ class SecurityReport {
     required this.analyzedFile,
   });
 
-  int get criticalIssues => issues.where((i) => i.severity == 'critical').length;
+  int get criticalIssues =>
+      issues.where((i) => i.severity == 'critical').length;
   int get highIssues => issues.where((i) => i.severity == 'high').length;
   int get mediumIssues => issues.where((i) => i.severity == 'medium').length;
   int get lowIssues => issues.where((i) => i.severity == 'low').length;
@@ -72,8 +73,10 @@ class SecurityAnalyzer {
       'pattern': r'eval\(',
       'severity': 'critical',
       'title': 'Use of eval() function',
-      'description': 'eval() can execute arbitrary code and is a major security risk',
-      'recommendation': 'Avoid eval() and use safer alternatives like JSON parsing or specific functions',
+      'description':
+          'eval() can execute arbitrary code and is a major security risk',
+      'recommendation':
+          'Avoid eval() and use safer alternatives like JSON parsing or specific functions',
     },
     {
       'pattern': r'innerHTML\s*=',
@@ -90,39 +93,51 @@ class SecurityAnalyzer {
       'recommendation': 'Use DOM manipulation methods instead',
     },
     {
+      'pattern': r'<\s*script\b',
+      'severity': 'high',
+      'title': 'Embedded script tag',
+      'description': 'Embedded script markup can enable cross-site scripting',
+      'recommendation': 'Avoid executable markup and sanitize untrusted HTML',
+    },
+    {
       'pattern': r'localStorage\.setItem\(',
       'severity': 'medium',
       'title': 'Unencrypted localStorage usage',
-      'description': 'Storing sensitive data in localStorage without encryption',
+      'description':
+          'Storing sensitive data in localStorage without encryption',
       'recommendation': 'Use encryption or secure storage alternatives',
     },
     {
       'pattern': r'sessionStorage\.setItem\(',
       'severity': 'medium',
       'title': 'Unencrypted sessionStorage usage',
-      'description': 'Storing sensitive data in sessionStorage without encryption',
+      'description':
+          'Storing sensitive data in sessionStorage without encryption',
       'recommendation': 'Use encryption or secure storage alternatives',
     },
     {
-      'pattern': r'password\s*=\s*["\'].*["\']',
+      'pattern': r'''password\s*=\s*["'].*["']''',
       'severity': 'critical',
       'title': 'Hardcoded password detected',
       'description': 'Password is hardcoded in the source code',
-      'recommendation': 'Use environment variables or secure credential management',
+      'recommendation':
+          'Use environment variables or secure credential management',
     },
     {
-      'pattern': r'api[_-]?key\s*=\s*["\'].*["\']',
+      'pattern': r'''api[_-]?key\s*=\s*["'].*["']''',
       'severity': 'critical',
       'title': 'Hardcoded API key detected',
       'description': 'API key is hardcoded in the source code',
-      'recommendation': 'Use environment variables or secure credential management',
+      'recommendation':
+          'Use environment variables or secure credential management',
     },
     {
-      'pattern': r'secret[_-]?key\s*=\s*["\'].*["\']',
+      'pattern': r'''secret[_-]?key\s*=\s*["'].*["']''',
       'severity': 'critical',
       'title': 'Hardcoded secret key detected',
       'description': 'Secret key is hardcoded in the source code',
-      'recommendation': 'Use environment variables or secure credential management',
+      'recommendation':
+          'Use environment variables or secure credential management',
     },
     {
       'pattern': r'http://(?!(localhost|127\.0\.0\.1))',
@@ -132,7 +147,7 @@ class SecurityAnalyzer {
       'recommendation': 'Use HTTPS for all network communications',
     },
     {
-      'pattern': r'fetch\(["\']http://',
+      'pattern': r'''fetch\(["']http://''',
       'severity': 'medium',
       'title': 'Insecure fetch request',
       'description': 'Making fetch requests over insecure HTTP',
@@ -150,10 +165,10 @@ class SecurityAnalyzer {
       final lineNumber = i + 1;
 
       for (var pattern in _securityPatterns) {
-        final regex = RegExp(pattern['pattern']!);
+        final regex = RegExp(pattern['pattern']!, caseSensitive: false);
         final matches = regex.allMatches(line);
 
-        for (var match in matches) {
+        for (final _ in matches) {
           issues.add(SecurityIssue(
             severity: pattern['severity']!,
             title: pattern['title']!,
@@ -185,9 +200,9 @@ class SecurityAnalyzer {
   /// Check for external resource usage
   List<SecurityIssue> _checkForExternalResources(String sourceCode) {
     final issues = <SecurityIssue>[];
-    
+
     final externalResourcePattern = RegExp(
-      r'(https?://[^\s"\'<>]+)',
+      r'''(https?://[^\s"'<>]+)''',
       caseSensitive: false,
     );
 
@@ -198,10 +213,10 @@ class SecurityAnalyzer {
       final url = match.group(1)!;
       if (!foundUrls.contains(url)) {
         foundUrls.add(url);
-        
+
         // Check if URL uses HTTPS
-        if (url.startsWith('http://') && 
-            !url.contains('localhost') && 
+        if (url.startsWith('http://') &&
+            !url.contains('localhost') &&
             !url.contains('127.0.0.1')) {
           issues.add(SecurityIssue(
             severity: 'medium',
@@ -220,9 +235,9 @@ class SecurityAnalyzer {
   /// Check for navigation targets
   List<SecurityIssue> _checkForNavigationTargets(String sourceCode) {
     final issues = <SecurityIssue>[];
-    
+
     final navPattern = RegExp(
-      r'(navigateTo|navigate\.push|window\.location\.href)\s*\(\s*["\']([^"\']+)["\']',
+      r'''(navigateTo|navigate\.push|window\.location\.href)\s*\(\s*["']([^"']+)["']''',
       caseSensitive: false,
     );
 
@@ -230,9 +245,8 @@ class SecurityAnalyzer {
 
     for (var match in matches) {
       final target = match.group(2)!;
-      
-      if (target.startsWith('http://') && 
-          !target.contains('localhost')) {
+
+      if (target.startsWith('http://') && !target.contains('localhost')) {
         issues.add(SecurityIssue(
           severity: 'medium',
           title: 'Insecure navigation target',
@@ -249,9 +263,9 @@ class SecurityAnalyzer {
   /// Check for permission requests
   List<SecurityIssue> _checkForPermissionRequests(String sourceCode) {
     final issues = <SecurityIssue>[];
-    
+
     final permissionPattern = RegExp(
-      r'requestPermission|request\(["\'].*permission',
+      r'''requestPermission|request\(["'].*permission''',
       caseSensitive: false,
     );
 
@@ -302,7 +316,8 @@ class SecurityAnalyzer {
   }
 
   /// Compare two security reports
-  Map<String, dynamic> compareReports(SecurityReport oldReport, SecurityReport newReport) {
+  Map<String, dynamic> compareReports(
+      SecurityReport oldReport, SecurityReport newReport) {
     final oldIssues = oldReport.issues.map((i) => i.title).toSet();
     final newIssues = newReport.issues.map((i) => i.title).toSet();
 

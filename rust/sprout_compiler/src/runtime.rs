@@ -66,7 +66,8 @@ impl WasmRuntime {
         self.execution_log.clear();
 
         // Security: Validate app before execution
-        app.validate().map_err(|e| anyhow::anyhow!(e))
+        app.validate()
+            .map_err(|e| anyhow::anyhow!(e))
             .context("App validation failed")?;
 
         // Security: Initialize state
@@ -75,12 +76,16 @@ impl WasmRuntime {
         }
 
         // Find start screen
-        let screen = app.screens.iter()
+        let screen = app
+            .screens
+            .iter()
             .find(|s| s.name == start_screen)
             .ok_or_else(|| anyhow::anyhow!("Start screen not found: {}", start_screen))?;
 
         // Security: Validate screen
-        screen.validate().map_err(|e| anyhow::anyhow!(e))
+        screen
+            .validate()
+            .map_err(|e| anyhow::anyhow!(e))
             .context("Screen validation failed")?;
 
         // Execute screen
@@ -94,7 +99,10 @@ impl WasmRuntime {
 
         // Security: Check memory usage
         if self.memory_usage > self.options.max_memory {
-            return Err(anyhow::anyhow!("Memory limit exceeded: {}", self.memory_usage));
+            return Err(anyhow::anyhow!(
+                "Memory limit exceeded: {}",
+                self.memory_usage
+            ));
         }
 
         Ok(ExecutionResult {
@@ -136,7 +144,10 @@ impl WasmRuntime {
                 self.execute_action(action)?;
                 self.track_memory_usage(label.len() + 100); // Estimate button memory
             }
-            UiElement::TextField { placeholder, bind_to } => {
+            UiElement::TextField {
+                placeholder,
+                bind_to,
+            } => {
                 self.track_memory_usage(placeholder.len());
                 // Security: Track binding variable
                 if !self.state.contains_key(bind_to) {
@@ -183,52 +194,63 @@ impl WasmRuntime {
             Action::CallFunction { function, args } => {
                 // Security: Check for dangerous function calls
                 if function.contains("eval") || function.contains("exec") {
-                    return Err(anyhow::anyhow!("Dangerous function call detected: {}", function));
+                    return Err(anyhow::anyhow!(
+                        "Dangerous function call detected: {}",
+                        function
+                    ));
                 }
-                
+
                 // Security: Limit number of arguments
                 if args.len() > 10 {
                     return Err(anyhow::anyhow!("Too many arguments: {}", args.len()));
                 }
-                
+
                 for arg in args {
                     self.evaluate_expression(arg)?;
                 }
             }
-            Action::If { condition, then, r#else: else_action } => {
+            Action::If {
+                condition,
+                then,
+                r#else: else_action,
+            } => {
                 // Security: Evaluate condition
                 let condition_result = self.evaluate_condition(condition)?;
-                
+
                 if condition_result {
                     self.execute_action(then)?;
                 } else if let Some(else_act) = else_action {
                     self.execute_action(else_act)?;
                 }
             }
-            Action::Loop { variable, range, body } => {
+            Action::Loop {
+                variable,
+                range,
+                body,
+            } => {
                 // Security: Limit loop iterations
                 if body.len() > 100 {
                     return Err(anyhow::anyhow!("Loop body too large"));
                 }
-                
+
                 // Security: Parse range and limit iterations
                 let range_values: Vec<i64> = range
                     .split("..")
                     .filter_map(|s| s.trim().parse().ok())
                     .collect();
-                
+
                 if range_values.len() != 2 {
                     return Err(anyhow::anyhow!("Invalid range format"));
                 }
-                
+
                 let start = range_values[0].min(range_values[1]);
                 let end = range_values[0].max(range_values[1]);
                 let max_iterations = (end - start + 1).min(100) as usize; // Max 100 iterations
-                
+
                 for i in start..start + max_iterations as i64 {
                     // Security: Update loop variable
                     self.update_state(variable, ValueType::Number(i))?;
-                    
+
                     // Security: Execute loop body
                     for action in body {
                         self.execute_action(action)?;
@@ -245,12 +267,12 @@ impl WasmRuntime {
         if name.len() > 50 {
             return Err(anyhow::anyhow!("State variable name too long"));
         }
-        
+
         // Security: Check for dangerous patterns
         if name.contains("eval") || name.contains("exec") {
             return Err(anyhow::anyhow!("Dangerous variable name: {}", name));
         }
-        
+
         // Security: Validate value size
         match &value {
             ValueType::String(s) => {
@@ -265,17 +287,15 @@ impl WasmRuntime {
                 }
                 self.track_memory_usage(arr.len() * 8);
             }
-            ValueType::Object(obj) => {
-                if obj.len() > 50 {
-                    return Err(anyhow::anyhow!("Object too large"));
-                }
+            ValueType::Object(obj) if obj.len() > 50 => {
+                return Err(anyhow::anyhow!("Object too large"));
             }
             _ => {}
         }
-        
+
         self.state.insert(name.to_string(), value.clone());
         self.log_event(ExecutionEvent::StateUpdated(name.to_string(), value));
-        
+
         Ok(())
     }
 
@@ -284,10 +304,10 @@ impl WasmRuntime {
         if expression.contains("eval") || expression.contains("exec") {
             return Err(anyhow::anyhow!("Dangerous expression detected"));
         }
-        
+
         // Security: Evaluate simple expressions
         let trimmed = expression.trim();
-        
+
         // Boolean literals
         if trimmed == "true" {
             return Ok(ValueType::Boolean(true));
@@ -295,23 +315,23 @@ impl WasmRuntime {
         if trimmed == "false" {
             return Ok(ValueType::Boolean(false));
         }
-        
+
         // Number literals
         if let Ok(num) = trimmed.parse::<i64>() {
             return Ok(ValueType::Number(num));
         }
-        
+
         // String literals
         if trimmed.starts_with('"') && trimmed.ends_with('"') {
-            let text = &trimmed[1..trimmed.len()-1];
+            let text = &trimmed[1..trimmed.len() - 1];
             return Ok(ValueType::String(text.to_string()));
         }
-        
+
         // Variable references
         if let Some(value) = self.state.get(trimmed) {
             return Ok(value.clone());
         }
-        
+
         // Default: treat as string
         Ok(ValueType::String(trimmed.to_string()))
     }
@@ -321,10 +341,10 @@ impl WasmRuntime {
         if condition.contains("eval") || condition.contains("exec") {
             return Err(anyhow::anyhow!("Dangerous condition detected"));
         }
-        
+
         // Security: Simple condition evaluation
         let trimmed = condition.trim();
-        
+
         // Direct boolean
         if trimmed == "true" {
             return Ok(true);
@@ -332,36 +352,40 @@ impl WasmRuntime {
         if trimmed == "false" {
             return Ok(false);
         }
-        
+
         // Number comparison
         if let Some(pos) = trimmed.find("==") {
             let left = &trimmed[..pos].trim();
-            let right = &trimmed[pos+2..].trim();
-            
+            let right = &trimmed[pos + 2..].trim();
+
             if let (Ok(left_val), Ok(right_val)) = (left.parse::<i64>(), right.parse::<i64>()) {
                 return Ok(left_val == right_val);
             }
         }
-        
+
         // String comparison
         if let Some(pos) = trimmed.find("==") {
             let left = &trimmed[..pos].trim();
-            let right = &trimmed[pos+2..].trim();
-            
-            if left.starts_with('"') && left.ends_with('"') && right.starts_with('"') && right.ends_with('"') {
-                let left_str = &left[1..left.len()-1];
-                let right_str = &right[1..right.len()-1];
+            let right = &trimmed[pos + 2..].trim();
+
+            if left.starts_with('"')
+                && left.ends_with('"')
+                && right.starts_with('"')
+                && right.ends_with('"')
+            {
+                let left_str = &left[1..left.len() - 1];
+                let right_str = &right[1..right.len() - 1];
                 return Ok(left_str == right_str);
             }
         }
-        
+
         // Default: false for safety
         Ok(false)
     }
 
     fn track_memory_usage(&mut self, bytes: usize) {
         self.memory_usage += bytes;
-        
+
         // Security: Check memory limit
         if self.memory_usage > self.options.max_memory {
             self.log_event(ExecutionEvent::Error("Memory limit exceeded".to_string()));
@@ -395,7 +419,11 @@ pub struct RuntimeStatistics {
 }
 
 // Public execute function
-pub fn execute_sprout_app(app: &App, start_screen: &str, options: Option<RuntimeOptions>) -> Result<ExecutionResult> {
+pub fn execute_sprout_app(
+    app: &App,
+    start_screen: &str,
+    options: Option<RuntimeOptions>,
+) -> Result<ExecutionResult> {
     let runtime_options = options.unwrap_or_default();
     let mut runtime = WasmRuntime::new(runtime_options);
     runtime.execute(app, start_screen)
@@ -405,30 +433,45 @@ pub fn execute_sprout_app(app: &App, start_screen: &str, options: Option<Runtime
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_execute_simple_app() {
-        let app = App {
+    fn app_with_ui(ui: Vec<UiElement>) -> App {
+        App {
             name: "Test".to_string(),
             start_screen: "Home".to_string(),
-            screens: vec![],
+            screens: vec![Screen {
+                name: "Home".to_string(),
+                state: vec![],
+                ui,
+            }],
             state: vec![],
-        };
-        
-        let result = execute_sprout_app(&app, "Home", None);
-        assert!(result.is_ok());
+        }
     }
 
     #[test]
-    fn test_security_reject_dangerous_code() {
-        let app = App {
-            name: "Test".to_string(),
-            start_screen: "Home".to_string(),
-            screens: vec![],
-            state: vec![],
-        };
-        
-        let result = execute_sprout_app(&app, "Home", None);
-        // Test would need dangerous code to actually fail
-        assert!(result.is_ok());
+    fn test_execute_simple_app() {
+        let app = app_with_ui(vec![UiElement::Label {
+            text: "Hello".to_string(),
+        }]);
+
+        let result = execute_sprout_app(&app, "Home", None).expect("valid app should execute");
+        assert!(result.success);
+        assert!(matches!(
+            result.events.first(),
+            Some(ExecutionEvent::ScreenLoaded(name)) if name == "Home"
+        ));
+    }
+
+    #[test]
+    fn test_security_rejects_dangerous_function_call() {
+        let app = app_with_ui(vec![UiElement::Button {
+            label: "Run".to_string(),
+            action: Action::CallFunction {
+                function: "eval".to_string(),
+                args: vec![],
+            },
+        }]);
+
+        let error = execute_sprout_app(&app, "Home", None)
+            .expect_err("dangerous functions must be rejected");
+        assert!(format!("{error:#}").contains("Dangerous function call"));
     }
 }

@@ -1,457 +1,141 @@
-name: Secure Release Build
+name: Signed Android Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version'
+        description: Release tag to publish, for example v1.0.0
         required: true
-        default: 'v1.0.0'
+        type: string
+
+permissions:
+  contents: write
+  security-events: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  FLUTTER_VERSION: '3.19.6'
+  FLUTTER_VERSION: '3.24.0'
   JAVA_VERSION: '17'
-  NDK_VERSION: 'r25c'
+  NDK_VERSION: 'r26d'
 
 jobs:
   security-audit:
-    name: Security Audit
+    name: Dependency and secret audit
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Run Dependency Scan
-        run: |
-          echo "🔍 Scanning for vulnerabilities..."
-          
-          # Check for hardcoded secrets
-          if grep -r -E "(password|secret|key|token)" --include="*.dart" --include="*.rs" --exclude-dir=".git" .; then
-            echo "⚠️  Potential secrets detected in source code"
-            exit 1
-          fi
-          
-          # Check for dangerous patterns
-          if grep -r -E "(eval|exec|system)" --include="*.dart" --include="*.rs" --exclude-dir=".git" .; then
-            echo "⚠️  Dangerous function calls detected"
-            # Don't fail - could be legitimate usage
-          fi
-          
-          echo "✅ Basic security scan completed"
-
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-action@stable
         with:
           toolchain: stable
-          components: clippy
-
-      - name: Rust Security Audit
+      - uses: taiki-e/install-action@cargo-audit
+      - name: Audit Rust dependencies
+        working-directory: rust/sprout_compiler
+        run: cargo audit
+      - name: Check for credential-like literals
         run: |
-          cd rust/sprout_compiler
-          cargo install cargo-audit --locked
-          cargo audit --json > audit_results.json || true
-          
-          if [ -s audit_results.json ]; then
-            echo "🔍 Security audit results:"
-            cat audit_results.json
-          fi
-
-      - name: Upload Security Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-audit-report
-          path: rust/sprout_compiler/audit_results.json
-          retention-days: 30
+          ! git grep -nEI '(AKIA[0-9A-Z]{16}|-----BEGIN( [A-Z]+)? PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,})' -- '*.dart' '*.rs' '*.gradle' '*.yml' '*.yaml'
 
   build:
-    name: Build and Test
+    name: Build, test, and sign Android artifacts
     needs: security-audit
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          fetch-depth: 0
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
-          cache: true
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
+          distribution: zulu
           java-version: ${{ env.JAVA_VERSION }}
-
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-action@stable
         with:
           toolchain: stable
-          target: aarch64-linux-android
-          override: true
-          components: rustfmt, clippy
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          components: rustfmt,clippy
+      - uses: nttld/setup-ndk@v1
         with:
           ndk-version: ${{ env.NDK_VERSION }}
-
-      - name: Install cargo-ndk
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Install Flutter dependencies
+        working-directory: sprout_app_flutter
+        run: flutter pub get
+      - name: Run Flutter quality checks
+        working-directory: sprout_app_flutter
+        run: |
+          dart format --set-exit-if-changed lib test
+          flutter analyze --no-fatal-infos
+          flutter test test
+      - name: Run Rust quality checks
+        working-directory: rust/sprout_compiler
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo test --all-features
+      - name: Build Rust native libraries
         run: |
           cargo install cargo-ndk --locked
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Cache Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            ~/.cargo/registry
-            ~/.cargo/git
-            rust/sprout_compiler/target
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/pubspec.lock', '**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-
-      - name: Verify Environment
-        run: |
-          echo "🔧 Environment Check"
-          flutter doctor -v
-          rustc --version
-          cargo --version
-          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-          echo "NDK_HOME: $NDK_HOME"
-
-      - name: Install Flutter Dependencies
-        working-directory: ./flutter
-        run: |
-          flutter pub get
-          dart pub global activate flutter_rust_bridge_codegen
-
-      - name: Rust Quality Checks
-        working-directory: ./rust/sprout_compiler
-        run: |
-          echo "🦀 Rust Quality Checks"
-          cargo fmt -- --check
-          cargo clippy --all-targets --all-features -- -D warnings
-          cargo test --verbose
-
-      - name: Build Rust Bridge
-        working-directory: ./flutter
-        run: |
-          echo "🌉 Building Rust Bridge"
-          flutter_rust_bridge_codegen
-          
-          # Verify bridge was generated
-          if [ ! -f "lib/generated_bridge.dart" ]; then
-            echo "❌ Bridge generation failed"
-            exit 1
-          fi
-          
-          echo "✅ Rust bridge generated successfully"
-
-      - name: Flutter Quality Checks
-        working-directory: ./flutter
-        run: |
-          echo "🎯 Flutter Quality Checks"
-          flutter analyze --fatal-infos
-          flutter test
-          
-          echo "✅ Flutter checks completed"
-
-      - name: Configure Secure Signing
+          bash scripts/build_android_native.sh
+      - name: Configure Android release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_STORE_PASS: ${{ secrets.KEYSTORE_STORE_PASS }}
           KEYSTORE_KEY_PASS: ${{ secrets.KEYSTORE_KEY_PASS }}
           KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
         run: |
-          echo "🔐 Configuring Android Signing"
-          
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "❌ KEYSTORE_BASE64 not set"
-            exit 1
-          fi
-          
-          # Create secure keystore
-          mkdir -p ./flutter/android/app
-          echo "$KEYSTORE_BASE64" | base64 --decode > ./flutter/android/app/sprout-release.keystore
-          
-          # Create key properties securely
-          cat > ./flutter/android/app/key.properties << EOF
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_STORE_PASS"
+          test -n "$KEYSTORE_KEY_PASS"
+          test -n "$KEYSTORE_KEY_ALIAS"
+          echo "$KEYSTORE_BASE64" | base64 --decode > sprout_app_flutter/android/app/sprout-release.keystore
+          cat > sprout_app_flutter/android/app/key.properties <<EOF
           storePassword=$KEYSTORE_STORE_PASS
           keyPassword=$KEYSTORE_KEY_PASS
           keyAlias=$KEYSTORE_KEY_ALIAS
           storeFile=sprout-release.keystore
           EOF
-          
-          # Verify keystore integrity
-          keytool -list -keystore ./flutter/android/app/sprout-release.keystore -storepass "$KEYSTORE_STORE_PASS" -v || {
-            echo "❌ Keystore verification failed"
-            exit 1
-          }
-          
-          echo "✅ Signing configuration complete"
-
-      - name: Build Release APK
-        working-directory: ./flutter
+          keytool -list -keystore sprout_app_flutter/android/app/sprout-release.keystore -storepass "$KEYSTORE_STORE_PASS" >/dev/null
+      - name: Build signed Android artifacts
+        working-directory: sprout_app_flutter
         run: |
-          echo "📱 Building Release APK"
-          
-          flutter build apk --release \
-            --obfuscate \
-            --split-debug-info=./build/symbols \
-            --target-platform=android-arm64 \
-            --dart-define=APP_VERSION="${{ github.ref_name }}" \
-            --dart-define=BUILD_NUMBER="${{ github.run_number }}" \
-            --verbose
-          
-          echo "✅ APK build completed"
-
-      - name: Verify Build Artifacts
-        run: |
-          echo "🔍 Verifying Build Artifacts"
-          
-          APK_PATH="flutter/build/app/outputs/flutter-apk/app-release.apk"
-          
-          if [ ! -f "$APK_PATH" ]; then
-            echo "❌ APK not found at $APK_PATH"
-            exit 1
-          fi
-          
-          APK_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || stat -f%z "$APK_PATH")
-          echo "📏 APK Size: $(($APK_SIZE / 1024 / 1024)) MB"
-          
-          if [ "$APK_SIZE" -lt 1000000 ]; then
-            echo "⚠️  APK seems unusually small ($APK_SIZE bytes)"
-            exit 1
-          fi
-          
-          # Calculate checksums
-          SHA256=$(sha256sum "$APK_PATH" | cut -d' ' -f1)
-          echo "🔐 APK SHA256: $SHA256"
-          echo "apk_sha256=$SHA256" >> $GITHUB_ENV
-          
-          # Verify APK structure
-          if command -v aapt > /dev/null 2>&1; then
-            echo "📋 APK Info:"
-            aapt dump badging "$APK_PATH" | head -5
-          fi
-          
-          echo "✅ Build verification completed"
-
-      - name: Run Integration Tests
-        working-directory: ./flutter
-        run: |
-          echo "🧪 Running Integration Tests"
-          flutter test integration_test/ || {
-            echo "⚠️  Some integration tests failed"
-            # Don't fail the build for integration test failures
-          }
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
+          flutter build apk --release --obfuscate --split-debug-info=build/symbols
+          flutter build appbundle --release --obfuscate --split-debug-info=build/symbols
+          sha256sum build/app/outputs/flutter-apk/app-release.apk > build/app/outputs/flutter-apk/app-release.apk.sha256
+          sha256sum build/app/outputs/bundle/release/app-release.aab > build/app/outputs/bundle/release/app-release.aab.sha256
+      - uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts-${{ github.ref_name }}
+          name: android-release-${{ github.ref_name }}
           path: |
-            flutter/build/app/outputs/flutter-apk/app-release.apk
-            flutter/build/symbols/
+            sprout_app_flutter/build/app/outputs/flutter-apk/app-release.apk
+            sprout_app_flutter/build/app/outputs/flutter-apk/app-release.apk.sha256
+            sprout_app_flutter/build/app/outputs/bundle/release/app-release.aab
+            sprout_app_flutter/build/app/outputs/bundle/release/app-release.aab.sha256
+            sprout_app_flutter/build/symbols/
           retention-days: 90
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: 🌱 Sprout ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-          body: |
-            ## 🌱 Sprout ${{ github.ref_name }}
-            
-            **Grow apps that grow with you** - A secure, privacy-first mobile development platform.
-            
-            ### 🚀 What's New
-            - Enhanced security validation and sandboxing
-            - Improved compilation performance
-            - Better error handling and diagnostics
-            - Updated dependencies for security
-            
-            ### 📱 Installation
-            1. Download `Sprout-${{ github.ref_name }}.apk` below
-            2. Enable "Install from unknown sources" in Android settings
-            3. Install the APK and start creating!
-            
-            ### 🔒 Security Information
-            - **APK SHA256**: `${{ env.apk_sha256 }}`
-            - **Build Number**: `${{ github.run_number }}`
-            - **Flutter Version**: `${{ env.FLUTTER_VERSION }}`
-            - **Signed**: ✅ All releases are cryptographically signed
-            - **Verified**: ✅ No malware, no data collection, no tracking
-            
-            ### 🛡️ Security Features
-            - All code execution is sandboxed and validated
-            - No external network access during app execution
-            - File system access is strictly controlled
-            - Input sanitization and injection prevention
-            - Comprehensive security analysis during compilation
-            
-            ### 📖 Documentation
-            - [Getting Started Guide](https://github.com/${{ github.repository }}/blob/main/docs/getting-started.md)
-            - [SproutScript Language Reference](https://github.com/${{ github.repository }}/blob/main/docs/language-reference.md)
-            - [Security Model](https://github.com/${{ github.repository }}/blob/main/SECURITY.md)
-            
-            ### 🐛 Bug Reports
-            Found an issue? [Report it here](https://github.com/${{ github.repository }}/issues/new/choose)
-            
-            ---
-            
-            **Full Changelog**: [View Changes](https://github.com/${{ github.repository }}/compare/v1.0.0...${{ github.ref_name }})
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: flutter/build/app/outputs/flutter-apk/app-release.apk
-          asset_name: Sprout-${{ github.ref_name }}.apk
-          asset_content_type: application/vnd.android.package-archive
-
-      - name: Upload Debug Symbols
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: flutter/build/symbols
-          asset_name: sprout-debug-symbols-${{ github.ref_name }}.zip
-          asset_content_type: application/zip
-
-      - name: Cleanup Sensitive Files
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            sprout_app_flutter/build/app/outputs/flutter-apk/app-release.apk
+            sprout_app_flutter/build/app/outputs/flutter-apk/app-release.apk.sha256
+            sprout_app_flutter/build/app/outputs/bundle/release/app-release.aab
+            sprout_app_flutter/build/app/outputs/bundle/release/app-release.aab.sha256
+      - name: Remove signing files
         if: always()
         run: |
-          echo "🧹 Cleaning up sensitive files"
-          rm -f ./flutter/android/app/sprout-release.keystore || true
-          rm -f ./flutter/android/app/key.properties || true
-          echo "✅ Cleanup completed"
-
-  post-build-security:
-    name: Post-Build Security Scan
-    needs: build
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download APK
-        uses: actions/download-artifact@v4
-        with:
-          name: release-artifacts-${{ github.ref_name }}
-          path: ./artifacts
-
-      - name: APK Security Analysis
-        run: |
-          echo "🔍 APK Security Analysis"
-          
-          APK_FILE="./artifacts/app-release.apk"
-          
-          if [ -f "$APK_FILE" ]; then
-            echo "📱 APK found, analyzing..."
-            
-            # Basic file analysis
-            file "$APK_FILE"
-            
-            # Extract APK for analysis
-            mkdir -p apk_analysis
-            cd apk_analysis
-            unzip "../$APK_FILE" > /dev/null 2>&1
-            
-            # Check for suspicious files
-            echo "🔍 Checking APK contents..."
-            
-            if find . -name "*.so" -exec echo "Native library: {}" \; | head -10; then
-              echo "✅ Native libraries found (expected)"
-            fi
-            
-            if find . -name "*.dex" -exec echo "DEX file: {}" \;; then
-              echo "✅ DEX files found (expected)"
-            fi
-            
-            # Check AndroidManifest.xml permissions
-            if [ -f "AndroidManifest.xml" ]; then
-              echo "📋 AndroidManifest.xml found"
-            fi
-            
-            echo "✅ APK analysis completed"
-          else
-            echo "❌ APK not found for analysis"
-            exit 1
-          fi
-
-      - name: Generate Security Report
-        run: |
-          echo "📊 Generating Security Report"
-          
-          cat > security_report.md << EOF
-          # Security Analysis Report
-          
-          **Build**: ${{ github.ref_name }}
-          **Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          **Commit**: ${{ github.sha }}
-          
-          ## Summary
-          - ✅ Source code scan: No secrets detected
-          - ✅ Rust security audit: Completed
-          - ✅ APK structure: Valid
-          - ✅ Signing: Cryptographically signed
-          
-          ## APK Information
-          - **SHA256**: ${{ env.apk_sha256 }}
-          - **Size**: $(stat -c%s ./artifacts/app-release.apk 2>/dev/null || echo "Unknown") bytes
-          
-          ## Security Features
-          - Input validation and sanitization
-          - Code execution sandboxing  
-          - File system access controls
-          - Network access restrictions
-          - Cryptographic signing
-          
-          EOF
-          
-          echo "✅ Security report generated"
-
-      - name: Upload Security Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-report-${{ github.ref_name }}
-          path: security_report.md
-          retention-days: 90
-
-  notify:
-    name: Release Notification
-    needs: [build, post-build-security]
-    runs-on: ubuntu-latest
-    if: success()
-    
-    steps:
-      - name: Success Notification
-        run: |
-          echo "🎉 Release ${{ github.ref_name }} completed successfully!"
-          echo "📱 APK available for download"
-          echo "🔒 Security validation passed"
-          echo "✅ All quality checks completed"
+          rm -f sprout_app_flutter/android/app/sprout-release.keystore
+          rm -f sprout_app_flutter/android/app/key.properties

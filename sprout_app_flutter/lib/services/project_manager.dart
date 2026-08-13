@@ -3,8 +3,8 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'package:secure_storage_service/secure_storage_service.dart';
-import 'package:encryption_service/encryption_service.dart';
+import 'secure_storage_service.dart';
+import 'encryption_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:crypto/crypto.dart';
@@ -71,20 +71,16 @@ class ProjectManager {
       // Security: Serialize project
       final projectJson = jsonEncode(project.toJson());
 
-      if (encrypt) {
-        // Security: Encrypt project data
-        final encrypted = await _encryptionService.encryptText(projectJson);
-        await _secureStorage.storeSecure('project_${project.id}', encrypted);
-      } else {
-        // Security: Store unencrypted (for development)
-        await _secureStorage.storeSecure('project_${project.id}', projectJson);
-      }
+      final storedData = encrypt
+          ? await _encryptionService.encryptText(projectJson)
+          : projectJson;
+      await _secureStorage.storeSecure('project_${project.id}', storedData);
 
       // Security: Update metadata
       await _saveProjectMetadata(project);
 
-      // Security: Calculate and store hash
-      final hash = _calculateProjectHash(project);
+      // Store an integrity hash of exactly the serialized value persisted above.
+      final hash = await _calculateHashFromData(storedData);
       await _secureStorage.storeSecure('project_${project.id}_hash', hash);
     } catch (e) {
       throw ProjectException('Failed to save project: $e');
@@ -92,7 +88,8 @@ class ProjectManager {
   }
 
   // Security: Load and decrypt project
-  Future<Project?> loadProject(String projectId, {bool encrypted = true}) async {
+  Future<Project?> loadProject(String projectId,
+      {bool encrypted = true}) async {
     try {
       // Security: Validate project ID
       if (projectId.isEmpty) {
@@ -107,7 +104,8 @@ class ProjectManager {
       }
 
       // Security: Verify hash
-      final storedHash = await _secureStorage.getSecure('project_${projectId}_hash');
+      final storedHash =
+          await _secureStorage.getSecure('project_${projectId}_hash');
       if (storedHash != null) {
         final currentHash = await _calculateHashFromData(data);
         if (currentHash != storedHash) {
@@ -143,8 +141,11 @@ class ProjectManager {
         throw ProjectException('Project not found');
       }
 
-      // Security: Serialize project
+      // Security: Serialize and, when requested, encrypt the exported payload.
       final projectJson = jsonEncode(project.toJson());
+      final exportData = encrypt
+          ? await _encryptionService.encryptText(projectJson)
+          : projectJson;
 
       // Security: Create .sprout file
       final sproutFile = SproutFile(
@@ -153,7 +154,7 @@ class ProjectManager {
         projectName: project.name,
         createdAt: project.createdAt,
         exportedAt: DateTime.now().millisecondsSinceEpoch,
-        data: projectJson,
+        data: exportData,
         encrypted: encrypt,
       );
 
@@ -175,7 +176,8 @@ class ProjectManager {
   }
 
   // Security: Import project from .sprout file
-  Future<Project> importProject(String filePath, {bool encrypted = true}) async {
+  Future<Project> importProject(String filePath,
+      {bool encrypted = true}) async {
     try {
       // Security: Validate file path
       if (!filePath.endsWith('.sprout')) {
@@ -205,8 +207,11 @@ class ProjectManager {
         throw ValidationException('Encryption mismatch');
       }
 
-      // Security: Deserialize project
-      final projectJson = jsonDecode(sproutFile.data) as Map<String, dynamic>;
+      // Security: Decrypt (when applicable) before deserializing the project.
+      final projectData = sproutFile.encrypted
+          ? await _encryptionService.decryptText(sproutFile.data)
+          : sproutFile.data;
+      final projectJson = jsonDecode(projectData) as Map<String, dynamic>;
       final project = Project.fromJson(projectJson);
 
       // Security: Save imported project
@@ -239,7 +244,8 @@ class ProjectManager {
   Future<List<ProjectMetadata>> listProjects() async {
     try {
       final keys = await _secureStorage.getAllKeys();
-      final projectKeys = keys.where((key) => key.endsWith('_metadata')).toList();
+      final projectKeys =
+          keys.where((key) => key.endsWith('_metadata')).toList();
 
       final projects = <ProjectMetadata>[];
       for (final key in projectKeys) {
@@ -273,7 +279,8 @@ class ProjectManager {
     }
 
     // Security: Validate code size
-    if (project.code.length > 100000) { // 100KB limit
+    if (project.code.length > 100000) {
+      // 100KB limit
       throw ValidationException('Project code too large');
     }
 
@@ -296,7 +303,8 @@ class ProjectManager {
     );
 
     final metadataJson = jsonEncode(metadata.toJson());
-    await _secureStorage.storeSecure('project_${project.id}_metadata', metadataJson);
+    await _secureStorage.storeSecure(
+        'project_${project.id}_metadata', metadataJson);
 
     _projectMetadata[project.id] = metadata;
   }
@@ -306,13 +314,6 @@ class ProjectManager {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final hash = sha256.convert(utf8.encode('$name-$timestamp'));
     return hash.toString().substring(0, 16);
-  }
-
-  // Security: Calculate project hash
-  Future<String> _calculateProjectHash(Project project) async {
-    final projectJson = jsonEncode(project.toJson());
-    final hash = sha256.convert(utf8.encode(projectJson));
-    return hash.toString();
   }
 
   // Security: Calculate hash from data

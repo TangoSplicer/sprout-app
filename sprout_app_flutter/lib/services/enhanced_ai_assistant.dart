@@ -1,7 +1,4 @@
 // flutter/lib/services/enhanced_ai_assistant.dart
-import 'dart:convert';
-import 'dart:math';
-import 'package:flutter/material.dart';
 
 /// Result of AI code generation
 class AIGenerationResult {
@@ -50,7 +47,7 @@ class CodeTemplate {
 class EnhancedAIAssistant {
   static final EnhancedAIAssistant _instance = EnhancedAIAssistant._internal();
   factory EnhancedAIAssistant() => _instance;
-  
+
   // Templates for code generation
   final List<CodeTemplate> _templates = [
     CodeTemplate(
@@ -102,7 +99,6 @@ screen TodoList {
   }
 }''',
     ),
-    
     CodeTemplate(
       name: 'Counter',
       description: 'A simple counter app with increment and decrement buttons',
@@ -138,7 +134,6 @@ screen Counter {
   }
 }''',
     ),
-    
     CodeTemplate(
       name: 'Navigation',
       description: 'A multi-screen app with navigation between screens',
@@ -173,10 +168,10 @@ screen {{screen2}} {
   }
 }''',
     ),
-    
     CodeTemplate(
       name: 'Note Taking',
-      description: 'A note-taking app with create, view, and delete functionality',
+      description:
+          'A note-taking app with create, view, and delete functionality',
       keywords: ['note', 'notes', 'notepad', 'memo', 'write'],
       requiredParams: [],
       optionalParams: {
@@ -260,7 +255,6 @@ screen EditNote(note) {
   }
 }''',
     ),
-    
     CodeTemplate(
       name: 'Habit Tracker',
       description: 'A habit tracking app to monitor daily habits',
@@ -346,7 +340,7 @@ screen AddHabit {
 }''',
     ),
   ];
-  
+
   EnhancedAIAssistant._internal();
 
   /// Generate code based on a prompt
@@ -354,103 +348,108 @@ screen AddHabit {
     try {
       // Simulate network delay
       await Future.delayed(const Duration(seconds: 1));
-      
+
       // Normalize prompt
       final normalizedPrompt = prompt.toLowerCase().trim();
-      
+
       // Find matching templates
       final matchingTemplates = _findMatchingTemplates(normalizedPrompt);
-      
+
       if (matchingTemplates.isEmpty) {
         return AIGenerationResult(
           code: _generateHelpCode(),
-          explanation: 'I couldn\'t find a template matching your request. Try describing what you want to build, like "todo list", "counter", or "note taking app".',
+          explanation:
+              'I couldn\'t find a template matching your request. Try describing what you want to build, like "todo list", "counter", or "note taking app".',
           isSuccess: true,
         );
       }
-      
+
       // Use the best matching template
       final template = matchingTemplates.first;
-      
+
       // Extract parameters from prompt
       final params = _extractParams(normalizedPrompt, template);
-      
+
       // Generate code from template
       final code = _generateFromTemplate(template, params);
-      
+
       return AIGenerationResult(
         code: code,
-        explanation: 'I generated a ${template.name} app based on your request. ${template.description}.',
+        explanation:
+            'I generated a ${template.name} app based on your request. ${template.description}.',
         isSuccess: true,
       );
     } catch (e) {
       return AIGenerationResult.error(e.toString());
     }
   }
-  
+
   /// Find templates matching the prompt
   List<CodeTemplate> _findMatchingTemplates(String prompt) {
     // Calculate match score for each template
     final scores = <CodeTemplate, int>{};
-    
+
     for (final template in _templates) {
       int score = 0;
-      
+
       // Check for keyword matches
       for (final keyword in template.keywords) {
         if (prompt.contains(keyword)) {
           score += 10;
         }
       }
-      
+
       scores[template] = score;
     }
-    
+
     // Sort templates by score (descending)
     final sortedTemplates = _templates.toList()
       ..sort((a, b) => scores[b]!.compareTo(scores[a]!));
-    
+
     // Return templates with non-zero scores
     return sortedTemplates.where((t) => scores[t]! > 0).toList();
   }
-  
+
   /// Extract parameters from prompt
   Map<String, String> _extractParams(String prompt, CodeTemplate template) {
     final params = <String, String>{};
-    
+
     // Start with default values for optional parameters
     params.addAll(template.optionalParams);
-    
+
     // TODO: In a real implementation, we would use NLP to extract parameters
     // For now, we'll use some simple heuristics
-    
+
     // Extract title if mentioned
-    final titleMatch = RegExp(r'called\s+["\']?([^"\']+)["\']?').firstMatch(prompt);
+    final titleMatch =
+        RegExp(r'''called\s+["']?([^"']+)["']?''').firstMatch(prompt);
     if (titleMatch != null && params.containsKey('title')) {
       params['title'] = titleMatch.group(1)!;
     }
-    
+
     // Extract initial value for counter
-    final initialValueMatch = RegExp(r'start(?:ing)?\s+(?:at|with)\s+(\d+)').firstMatch(prompt);
+    final initialValueMatch =
+        RegExp(r'start(?:ing)?\s+(?:at|with)\s+(\d+)').firstMatch(prompt);
     if (initialValueMatch != null && params.containsKey('initialValue')) {
       params['initialValue'] = initialValueMatch.group(1)!;
     }
-    
+
     return params;
   }
-  
+
   /// Generate code from template
-  String _generateFromTemplate(CodeTemplate template, Map<String, String> params) {
+  String _generateFromTemplate(
+      CodeTemplate template, Map<String, String> params) {
     String code = template.code;
-    
+
     // Replace parameters
     for (final entry in params.entries) {
       code = code.replaceAll('{{${entry.key}}}', entry.value);
     }
-    
+
     return code;
   }
-  
+
   /// Generate help code when no template matches
   String _generateHelpCode() {
     return '''app "Sprout Help" {
@@ -475,12 +474,12 @@ screen Help {
   }
 }''';
   }
-  
+
   /// Get all available templates
   List<CodeTemplate> getTemplates() {
     return List.unmodifiable(_templates);
   }
-  
+
   /// Add a custom template
   void addTemplate(CodeTemplate template) {
     _templates.add(template);

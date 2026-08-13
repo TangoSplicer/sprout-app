@@ -1,11 +1,12 @@
 // flutter/lib/screens/onboarding_screen.dart
+import 'dart:math';
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+
 import '../services/e2ee.dart';
-import '../services/ai_assistant.dart';
+import '../services/project_service.dart';
 import 'home_screen.dart';
 import 'ai_screen.dart';
-import 'share_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -19,16 +20,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _recoveryPhrase = '';
   bool _keysGenerated = false;
 
-  final List<Widget Function()> _screens = [
-    _buildWelcome,
-    _buildSecureSetup,
-    _buildAiIntro,
-    _buildChooseApp,
-    _buildEditorTour,
-    _buildFirstRun,
-    _buildShare,
-    _buildComplete,
-  ];
+  late final List<Widget Function()> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      _buildWelcome,
+      _buildSecureSetup,
+      _buildAiIntro,
+      _buildChooseApp,
+      _buildEditorTour,
+      _buildFirstRun,
+      _buildShare,
+      _buildComplete,
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,14 +43,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: _screens[_step](),
       bottomNavigationBar: _step < _screens.length - 1
           ? BottomAppBar(
-              child: Container(
+              child: SizedBox(
                 height: 60,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
                       onPressed: _nextStep,
-                      child: Text(_step < _screens.length - 2 ? 'Next' : 'Finish'),
+                      child:
+                          Text(_step < _screens.length - 2 ? 'Next' : 'Finish'),
                     ),
                   ],
                 ),
@@ -112,8 +120,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           if (!_keysGenerated)
             ElevatedButton(
               onPressed: () {
-                final keyPair = E2EE().generateKeyPair();
-                final words = _generateRecoveryPhrase(); // In real app: derive from key
+                E2EE().generateKeyPair();
+                final words = _generateRecoveryPhrase();
                 setState(() {
                   _recoveryPhrase = words;
                   _keysGenerated = true;
@@ -125,7 +133,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const Text('Recovery Phrase:'),
             SelectableText(
               _recoveryPhrase,
-              style: const TextStyle(fontFamily: 'monospace', color: Colors.blue),
+              style:
+                  const TextStyle(fontFamily: 'monospace', color: Colors.blue),
             ),
             const Text('Write this down. You’ll need it to recover your apps.'),
           ],
@@ -160,14 +169,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  const Text('Try: "A counter app"', style: TextStyle(fontStyle: FontStyle.italic)),
+                  const Text('Try: "A counter app"',
+                      style: TextStyle(fontStyle: FontStyle.italic)),
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const AIScreen(projectName: 'Counter'),
+                          builder: (_) =>
+                              const AIScreen(projectName: 'Counter'),
                         ),
                       );
                     },
@@ -197,32 +208,64 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             title: 'Water My Plants',
             subtitle: 'Reminders for your green friends',
             icon: Icons.eco,
-            onTap: () {
-              ProjectService().createProject('Plant Care');
-              _nextStep();
-            },
+            onTap: () => _createTemplateProject('Plant Care'),
           ),
           _ChoiceCard(
             title: 'To-Do List',
             subtitle: 'Simple tasks, no bloat',
             icon: Icons.checklist,
-            onTap: () {
-              ProjectService().createProject('My Tasks');
-              _nextStep();
-            },
+            onTap: () => _createTemplateProject('My Tasks'),
           ),
           _ChoiceCard(
             title: 'Counter',
             subtitle: 'Tap to count anything',
             icon: Icons.add,
-            onTap: () {
-              ProjectService().createProject('Counter');
-              _nextStep();
-            },
+            onTap: () => _createTemplateProject('Counter'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _createTemplateProject(String name) async {
+    try {
+      await ProjectService().createProject(name);
+      if (mounted) _nextStep();
+    } on ProjectException {
+      if (mounted) _nextStep();
+    }
+  }
+
+  String _generateRecoveryPhrase() {
+    const words = [
+      'amber',
+      'birch',
+      'cinder',
+      'dawn',
+      'ember',
+      'fern',
+      'grove',
+      'harbor',
+      'iris',
+      'jade',
+      'kindle',
+      'lunar',
+      'meadow',
+      'north',
+      'olive',
+      'pine',
+      'quartz',
+      'river',
+      'sage',
+      'thistle',
+      'umber',
+      'vale',
+      'willow',
+      'zephyr',
+    ];
+    final random = Random.secure();
+    return List<String>.generate(12, (_) => words[random.nextInt(words.length)])
+        .join(' ');
   }
 
   Widget _buildEditorTour() {
@@ -268,7 +311,11 @@ class _ChoiceCard extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _ChoiceCard({required this.title, required this.subtitle, required this.icon, required this.onTap});
+  const _ChoiceCard(
+      {required this.title,
+      required this.subtitle,
+      required this.icon,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {

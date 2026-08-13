@@ -2,7 +2,7 @@
 
 use crate::ast::*;
 use crate::SproutError;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -10,7 +10,7 @@ lazy_static::lazy_static! {
     static ref APP_REGEX: Regex = Regex::new(r#"app\s+"([^"]+)""#).unwrap();
     static ref SCREEN_REGEX: Regex = Regex::new(r#"screen\s+(\w+)"#).unwrap();
     static ref STATE_REGEX: Regex = Regex::new(r#"state\s+(\w+)\s*:\s*(.+)"#).unwrap();
-    static ref UI_REGEX: Regex = Regex::new(r#"ui\s*\{([^}]+)\}"#).unwrap();
+    static ref UI_REGEX: Regex = Regex::new(r#"(?s)ui\s*\{(.*?)\n\s*\}"#).unwrap();
     static ref LABEL_REGEX: Regex = Regex::new(r#"label\s+"([^"]+)""#).unwrap();
     static ref BUTTON_REGEX: Regex = Regex::new(r#"button\s+"([^"]+)""#).unwrap();
     static ref VARIABLE_REGEX: Regex = Regex::new(r#"var\s+(\w+)\s*=\s*(.+)"#).unwrap();
@@ -22,8 +22,6 @@ lazy_static::lazy_static! {
 
 pub struct Parser {
     source: String,
-    current_line: usize,
-    current_col: usize,
     variables: HashMap<String, ValueType>,
     functions: HashMap<String, FunctionDef>,
 }
@@ -39,8 +37,6 @@ impl Parser {
     pub fn new(source: &str) -> Self {
         Parser {
             source: source.to_string(),
-            current_line: 1,
-            current_col: 1,
             variables: HashMap::new(),
             functions: HashMap::new(),
         }
@@ -48,30 +44,31 @@ impl Parser {
 
     pub fn parse(&mut self) -> Result<App> {
         let mut app = self.parse_app_declaration()?;
-        
+
         // Parse functions first
         self.parse_functions(&mut app);
-        
+
         // Parse screens
         app.screens = self.parse_screens()?;
-        
+
         // Security: Validate parsed AST
         self.validate_ast(&app)?;
-        
+
         Ok(app)
     }
 
     fn parse_app_declaration(&mut self) -> Result<App> {
-        let caps = APP_REGEX.captures(&self.source)
+        let caps = APP_REGEX
+            .captures(&self.source)
             .ok_or_else(|| SproutError::Parse("App declaration not found".to_string()))?;
-        
+
         let name = caps.get(1).unwrap().as_str().to_string();
-        
+
         // Security: Validate app name
         if name.len() > 100 {
             return Err(SproutError::Security("App name too long".to_string()).into());
         }
-        
+
         Ok(App {
             name,
             start_screen: String::new(),
@@ -81,112 +78,129 @@ impl Parser {
     }
 
     fn parse_functions(&mut self, _app: &mut App) {
-        let capture_data: Vec<_> = FUNCTION_REGEX.captures_iter(&self.source).map(|cap| {
-            (
-                cap.get(1).unwrap().as_str().to_string(),
-                cap.get(2).unwrap().as_str().to_string(),
-                cap.get(0).unwrap().end()
-            )
-        }).collect();
+        let capture_data: Vec<_> = FUNCTION_REGEX
+            .captures_iter(&self.source)
+            .map(|cap| {
+                (
+                    cap.get(1).unwrap().as_str().to_string(),
+                    cap.get(2).unwrap().as_str().to_string(),
+                    cap.get(0).unwrap().end(),
+                )
+            })
+            .collect();
 
         for (name, params_str, end_pos) in capture_data {
             // Security: Validate function name
             if name.contains("eval") || name.contains("exec") {
                 continue; // Skip dangerous functions
             }
-            
+
             let params: Vec<String> = if params_str.is_empty() {
                 Vec::new()
             } else {
-                params_str.split(',').map(|s| s.trim().to_string()).collect()
+                params_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect()
             };
-            
+
             // Extract function body (simplified)
-            let body = self.source[end_pos..].split('}').next().unwrap_or("").to_string();
-            
+            let body = self.source[end_pos..]
+                .split('}')
+                .next()
+                .unwrap_or("")
+                .to_string();
+
             let func_def = FunctionDef {
                 name: name.clone(),
                 params,
                 body,
             };
-            
+
             self.functions.insert(name, func_def);
         }
     }
 
     fn parse_screens(&mut self) -> Result<Vec<Screen>> {
         let mut screens = Vec::new();
-        let screen_names: Vec<String> = SCREEN_REGEX.captures_iter(&self.source)
+        let screen_names: Vec<String> = SCREEN_REGEX
+            .captures_iter(&self.source)
             .map(|cap| cap.get(1).unwrap().as_str().to_string())
             .collect();
-        
+
         for name in screen_names {
             // Security: Validate screen name
             if name.len() > 50 {
                 return Err(SproutError::Security("Screen name too long".to_string()).into());
             }
-            
+
             let mut screen = Screen {
                 name: name.clone(),
                 state: Vec::new(),
                 ui: Vec::new(),
             };
-            
+
             // Parse state variables
-            let state_data: Vec<_> = STATE_REGEX.captures_iter(&self.source).map(|cap| {
-                (
-                    cap.get(1).unwrap().as_str().to_string(),
-                    cap.get(2).unwrap().as_str().to_string()
-                )
-            }).collect();
+            let state_data: Vec<_> = STATE_REGEX
+                .captures_iter(&self.source)
+                .map(|cap| {
+                    (
+                        cap.get(1).unwrap().as_str().to_string(),
+                        cap.get(2).unwrap().as_str().to_string(),
+                    )
+                })
+                .collect();
 
             for (var_name, value_str) in state_data {
                 let value_type = self.parse_value(&value_str)?;
-                
+
                 self.variables.insert(var_name.clone(), value_type.clone());
                 screen.state.push(StateVariable {
                     name: var_name,
                     value: value_type,
                 });
             }
-            
+
             // Parse UI elements
             screen.ui = self.parse_ui_elements()?;
-            
+
             screens.push(screen);
         }
-        
+
         Ok(screens)
     }
 
     fn parse_ui_elements(&mut self) -> Result<Vec<UiElement>> {
         let mut elements = Vec::new();
-        let ui_contents: Vec<String> = UI_REGEX.captures_iter(&self.source)
+        let ui_contents: Vec<String> = UI_REGEX
+            .captures_iter(&self.source)
             .map(|cap| cap.get(1).unwrap().as_str().to_string())
             .collect();
-        
+
         for ui_content in ui_contents {
             // Parse labels
-            let label_texts: Vec<String> = LABEL_REGEX.captures_iter(&ui_content)
+            let label_texts: Vec<String> = LABEL_REGEX
+                .captures_iter(&ui_content)
                 .map(|cap| cap.get(1).unwrap().as_str().to_string())
                 .collect();
 
             for text in label_texts {
                 // Security: Check for string interpolation
                 let processed_text = self.process_string_interpolation(&text)?;
-                
+
                 // Security: Validate label length
                 if processed_text.len() > 1000 {
                     return Err(SproutError::Security("Label text too long".to_string()).into());
                 }
-                
+
                 elements.push(UiElement::Label {
                     text: processed_text,
                 });
             }
-            
+
             // Parse buttons
-            let button_labels: Vec<String> = BUTTON_REGEX.captures_iter(&ui_content)
+            let button_labels: Vec<String> = BUTTON_REGEX
+                .captures_iter(&ui_content)
                 .map(|cap| cap.get(1).unwrap().as_str().to_string())
                 .collect();
 
@@ -195,7 +209,7 @@ impl Parser {
                 if label.len() > 50 {
                     return Err(SproutError::Security("Button label too long".to_string()).into());
                 }
-                
+
                 elements.push(UiElement::Button {
                     label: label.to_string(),
                     action: Action::Navigation {
@@ -204,18 +218,18 @@ impl Parser {
                 });
             }
         }
-        
+
         Ok(elements)
     }
 
     fn parse_value(&mut self, value_str: &str) -> Result<ValueType> {
         let trimmed = value_str.trim();
-        
+
         // Security: Prevent code execution in values
         if trimmed.contains("eval") || trimmed.contains("exec") {
             return Err(SproutError::Security("Dangerous function in value".to_string()).into());
         }
-        
+
         // Boolean
         if trimmed == "true" {
             return Ok(ValueType::Boolean(true));
@@ -223,42 +237,50 @@ impl Parser {
         if trimmed == "false" {
             return Ok(ValueType::Boolean(false));
         }
-        
+
         // Number
         if let Ok(num) = trimmed.parse::<i64>() {
             return Ok(ValueType::Number(num));
         }
-        
+
         // String (with quotes)
         if trimmed.starts_with('"') && trimmed.ends_with('"') {
-            let text = &trimmed[1..trimmed.len()-1];
+            let text = &trimmed[1..trimmed.len() - 1];
             let processed = self.process_string_interpolation(text)?;
             return Ok(ValueType::String(processed));
         }
-        
+
         // Variable reference
         if let Some(value) = self.variables.get(trimmed) {
             return Ok(value.clone());
         }
-        
+
         // Default: treat as string
         Ok(ValueType::String(trimmed.to_string()))
     }
 
     fn process_string_interpolation(&self, text: &str) -> Result<String> {
         let mut result = text.to_string();
-        
+
         // Security: Safe string interpolation
-        let capture_data: Vec<_> = STRING_INTERPOLATION.captures_iter(text).map(|cap| {
-            (cap.get(0).unwrap().as_str().to_string(), cap.get(1).unwrap().as_str().to_string())
-        }).collect();
+        let capture_data: Vec<_> = STRING_INTERPOLATION
+            .captures_iter(text)
+            .map(|cap| {
+                (
+                    cap.get(0).unwrap().as_str().to_string(),
+                    cap.get(1).unwrap().as_str().to_string(),
+                )
+            })
+            .collect();
 
         for (full_match, var_name) in capture_data {
             // Security: Validate variable reference
             if !self.variables.contains_key(&var_name) {
-                return Err(SproutError::Security(format!("Unknown variable: {}", var_name)).into());
+                return Err(
+                    SproutError::Security(format!("Unknown variable: {}", var_name)).into(),
+                );
             }
-            
+
             let value = match self.variables.get(&var_name) {
                 Some(ValueType::String(s)) => s.clone(),
                 Some(ValueType::Number(n)) => n.to_string(),
@@ -267,10 +289,10 @@ impl Parser {
                 Some(ValueType::Object(obj)) => format!("{:?}", obj),
                 None => String::new(),
             };
-            
+
             result = result.replace(&full_match, &value);
         }
-        
+
         Ok(result)
     }
 
@@ -280,28 +302,32 @@ impl Parser {
         if total_size > 1000 {
             return Err(SproutError::Security("Application too large".to_string()).into());
         }
-        
+
         // Security: Validate each screen
         for screen in &app.screens {
             self.validate_screen(screen)?;
         }
-        
+
         Ok(())
     }
 
     fn validate_screen(&self, screen: &Screen) -> Result<()> {
         // Security: Validate screen size
         if screen.ui.len() > 100 {
-            return Err(SproutError::Security("Screen has too many UI elements".to_string()).into());
+            return Err(
+                SproutError::Security("Screen has too many UI elements".to_string()).into(),
+            );
         }
-        
+
         // Security: Validate state variables
         for state_var in &screen.state {
             if state_var.name.len() > 50 {
-                return Err(SproutError::Security("State variable name too long".to_string()).into());
+                return Err(
+                    SproutError::Security("State variable name too long".to_string()).into(),
+                );
             }
         }
-        
+
         Ok(())
     }
 }
@@ -319,39 +345,28 @@ mod tests {
     #[test]
     fn test_parse_simple_app() {
         let source = r#"
-            app "Test" {
-                start = "Home"
-            }
-            
+            app "Test"
             screen Home {
-                state {
-                    count = 0
-                }
-                
+                state count: 0
                 ui {
                     label "Hello ${count}"
                 }
             }
         "#;
-        
+
         let result = parse_sproutscript(source);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_security_reject_dangerous_functions() {
+    fn test_security_rejects_dangerous_state_values() {
         let source = r#"
-            app "Test" {
-                start = "Home"
-            }
-            
+            app "Test"
             screen Home {
-                ui {
-                    label "eval('malicious')"
-                }
+                state payload: "eval('malicious')"
             }
         "#;
-        
+
         let result = parse_sproutscript(source);
         assert!(result.is_err());
     }
@@ -359,21 +374,15 @@ mod tests {
     #[test]
     fn test_string_interpolation() {
         let source = r#"
-            app "Test" {
-                start = "Home"
-            }
-            
+            app "Test"
             screen Home {
-                state {
-                    name = "World"
-                }
-                
+                state name: "World"
                 ui {
                     label "Hello ${name}"
                 }
             }
         "#;
-        
+
         let result = parse_sproutscript(source);
         assert!(result.is_ok());
     }

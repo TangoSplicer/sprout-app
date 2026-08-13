@@ -1,11 +1,9 @@
 // flutter/lib/services/qr_service.dart
 import 'dart:typed_data';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:archive/archive.dart';
-import 'package:path/path.dart' as p;
 import 'project_service.dart';
 
 class QrService {
@@ -38,15 +36,25 @@ class QrService {
     );
   }
 
-  // Parse QR data back to project
+  // Parse QR data back to a project. Only the expected source file is restored.
   static Future<void> loadFromQrData(Uint8List qrData, String newName) async {
-    final tarData = GZipDecoder().decodeBytes(qrData);
-    final archive = TarDecoder().decodeBytes(tarData);
-    
-    // We need to create the project first
-    await ProjectService().createProject(newName);
-    
-    // In a real app, we'd need a way to get the project path
-    // For now, this is a simplified version
+    if (qrData.isEmpty || qrData.length > 1024 * 1024) {
+      throw const FormatException('Invalid or oversized QR project payload');
+    }
+
+    final archive = TarDecoder().decodeBytes(GZipDecoder().decodeBytes(qrData));
+    final sourceFile = archive.files.where(
+      (file) => file.isFile && file.name == 'main.sprout',
+    );
+    if (sourceFile.isEmpty) {
+      throw const FormatException(
+          'QR project payload does not contain main.sprout');
+    }
+
+    final content = utf8.decode(sourceFile.first.content as List<int>,
+        allowMalformed: false);
+    final projects = ProjectService();
+    await projects.createProject(newName);
+    await projects.writeFile(newName, 'main.sprout', content);
   }
 }

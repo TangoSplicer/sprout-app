@@ -2,12 +2,16 @@
 // Provides secure execution environment for SproutScript
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 
 enum SandboxLevel { restricted, standard, unrestricted }
-enum SandboxViolationType { unsafe_function, network_access, file_access, memory_limit, timeout }
+
+enum SandboxViolationType {
+  unsafeFunction,
+  networkAccess,
+  fileAccess,
+  memoryLimit,
+  timeout
+}
 
 class SandboxViolation {
   final SandboxViolationType type;
@@ -104,7 +108,7 @@ class SandboxService {
           // Security: Check if allowed by sandbox level
           if (!_isFunctionAllowed(pattern)) {
             violations.add(SandboxViolation(
-              type: SandboxViolationType.unsafe_function,
+              type: SandboxViolationType.unsafeFunction,
               message: 'Dangerous function detected: $pattern',
               code: pattern,
               line: _getLineNumber(code, i),
@@ -132,7 +136,7 @@ class SandboxService {
             final domain = code.substring(urlStart, urlEnd);
             if (!_allowedDomains.contains(domain.toLowerCase())) {
               violations.add(SandboxViolation(
-                type: SandboxViolationType.network_access,
+                type: SandboxViolationType.networkAccess,
                 message: 'Unallowed network access to: $domain',
                 code: pattern + domain,
                 line: _getLineNumber(code, i),
@@ -158,7 +162,7 @@ class SandboxService {
           // Security: Check if file access is allowed
           if (_currentLevel == SandboxLevel.restricted) {
             violations.add(SandboxViolation(
-              type: SandboxViolationType.file_access,
+              type: SandboxViolationType.fileAccess,
               message: 'File access not allowed in restricted sandbox',
               code: pattern,
               line: _getLineNumber(code, i),
@@ -178,7 +182,7 @@ class SandboxService {
     int maxMemory = 1024 * 1024, // 1MB
   }) async {
     final violations = validateCode(code);
-    
+
     if (violations.isNotEmpty) {
       return {
         'success': false,
@@ -202,7 +206,7 @@ class SandboxService {
         type: SandboxViolationType.timeout,
         message: 'Execution timeout exceeded',
       ));
-      
+
       return {
         'success': false,
         'error': 'Execution timeout',
@@ -280,6 +284,7 @@ class SandboxService {
 }
 
 // Security: Timeout future
-Future<T> timeoutFuture<T>(Future<T> future, {required Duration timeout}) async {
+Future<T> timeoutFuture<T>(Future<T> future,
+    {required Duration timeout}) async {
   return future.timeout(timeout);
 }

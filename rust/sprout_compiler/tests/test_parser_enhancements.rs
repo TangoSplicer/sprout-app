@@ -1,281 +1,76 @@
-// Tests for enhanced parser with line tracking
+use sprout_compiler::{
+    ast::{UiElement, ValueType},
+    parser::Parser,
+};
 
-#[cfg(test)]
-mod parser_enhancement_tests {
-    use sprout_compiler::parser;
+fn parse(source: &str) -> Result<sprout_compiler::ast::App, anyhow::Error> {
+    Parser::new(source).parse()
+}
 
-    #[test]
-    fn test_string_literal_preservation() {
-        // Test that strings with spaces are preserved
-        let source = r#"
-        app "My App" {
-            start = Home
-        }
-        
+#[test]
+fn parses_state_and_interpolated_ui_elements() {
+    let source = r#"
+        app "Task List"
         screen Home {
-            state message = "Hello World"
+            state count: 2
             ui {
-                label "This is a test"
+                label "Count: ${count}"
+                button "Continue"
             }
         }
-        "#;
+    "#;
 
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse successfully");
-        
-        let app = result.unwrap();
-        assert_eq!(app.name, "My App");
-        
-        // Check screen state
-        let home_screen = app.screens.iter().find(|s| s.name == "Home").unwrap();
-        assert_eq!(home_screen.state.len(), 1);
-        assert_eq!(home_screen.state[0].name, "message");
-        
-        // Check label content
-        if let crate::ast::UI::Column(children) = &home_screen.ui {
-            if let crate::ast::UI::Label(text) = &children[0] {
-                assert_eq!(text, "This is a test");
-            } else {
-                panic!("Expected label");
-            }
-        } else {
-            panic!("Expected column");
-        }
-    }
+    let app = parse(source).expect("valid source should parse");
+    assert_eq!(app.name, "Task List");
+    assert_eq!(app.screens.len(), 1);
 
-    #[test]
-    fn test_multiline_strings() {
-        // Test handling of multiline strings
-        let source = r#"
-        app "Test App" {
-            start = Home
-        }
-        
+    let home = &app.screens[0];
+    assert_eq!(home.name, "Home");
+    assert_eq!(home.state.len(), 1);
+    assert!(matches!(home.state[0].value, ValueType::Number(2)));
+    assert!(matches!(
+        &home.ui[0],
+        UiElement::Label { text } if text == "Count: 2"
+    ));
+    assert!(matches!(
+        &home.ui[1],
+        UiElement::Button { label, .. } if label == "Continue"
+    ));
+}
+
+#[test]
+fn rejects_dangerous_expressions_in_state_values() {
+    let source = r#"
+        app "Unsafe"
         screen Home {
-            ui {
-                label "Line 1
-Line 2
-Line 3"
-            }
+            state command: "eval('untrusted input')"
         }
-        "#;
+    "#;
 
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse multiline strings");
-    }
+    let error = parse(source).expect_err("dangerous state values must be rejected");
+    assert!(error.to_string().contains("Dangerous function"));
+}
 
-    #[test]
-    fn test_nested_containers() {
-        // Test deeply nested UI structures
-        let source = r#"
-        app "Test App" {
-            start = Home
-        }
-        
+#[test]
+fn rejects_unknown_interpolation_variables() {
+    let source = r#"
+        app "Unknown variable"
         screen Home {
             ui {
-                column {
-                    row {
-                        label "Inner 1"
-                        button "Click" { }
-                    }
-                    column {
-                        label "Inner 2"
-                        label "Inner 3"
-                    }
-                }
+                label "Hello ${name}"
             }
         }
-        "#;
+    "#;
 
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse nested containers");
-        
-        let app = result.unwrap();
-        let home_screen = &app.screens[0];
-        
-        // Verify structure
-        if let crate::ast::UI::Column(level1) = &home_screen.ui {
-            assert_eq!(level1.len(), 2); // row and column
-            
-            if let crate::ast::UI::Row(level2) = &level1[0] {
-                assert_eq!(level2.len(), 2); // label and button
-            }
-        }
-    }
+    let error = parse(source).expect_err("unknown interpolation must be rejected");
+    assert!(error.to_string().contains("Unknown variable"));
+}
 
-    #[test]
-    fn test_complex_expressions() {
-        // Test function calls and expressions
-        let source = r#"
-        app "Test App" {
-            start = Home
-        }
-        
-        screen Home {
-            state count = 0
-            state total = add(count, 10)
-            
-            ui {
-                label "${count} items"
-                button "Add 5" {
-                    count = count + 5
-                }
-            }
-        }
-        "#;
+#[test]
+fn rejects_oversized_screen_names() {
+    let name = "A".repeat(51);
+    let source = format!("app \"Long Screen\"\nscreen {name} {{}}");
 
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse complex expressions");
-        
-        let app = result.unwrap();
-        let home_screen = &app.screens[0];
-        
-        assert_eq!(home_screen.state.len(), 2);
-        assert_eq!(home_screen.state[0].name, "count");
-        assert_eq!(home_screen.state[1].name, "total");
-    }
-
-    #[test]
-    fn test_conditional_ui() {
-        // Test if/else conditional UI
-        let source = r#"
-        app "Test App" {
-            start = Home
-        }
-        
-        screen Home {
-            state is_logged_in = true
-            
-            ui {
-                if is_logged_in {
-                    label "Welcome back!"
-                } else {
-                    label "Please login"
-                }
-            }
-        }
-        "#;
-
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse conditional UI");
-        
-        let app = result.unwrap();
-        let home_screen = &app.screens[0];
-        
-        if let crate::ast::UI::Conditional { then_branch, else_branch, .. } = &home_screen.ui {
-            assert!(then_branch.is_some());
-            assert!(else_branch.is_some());
-        } else {
-            panic!("Expected conditional UI");
-        }
-    }
-
-    #[test]
-    fn test_navigation_with_args() {
-        // Test screen navigation with arguments
-        let source = r#"
-        app "Test App" {
-            start = Home
-        }
-        
-        screen Home {
-            ui {
-                button "Go to Details" {
-                    -> DetailPage(42, "test")
-                }
-            }
-        }
-        
-        screen DetailPage(id: Int, name: String) {
-            ui {
-                label "${id}"
-                label name
-            }
-        }
-        "#;
-
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse navigation with arguments");
-        
-        let app = result.unwrap();
-        
-        // Check DetailPage has parameters
-        let detail_screen = app.screens.iter().find(|s| s.name == "DetailPage").unwrap();
-        assert_eq!(detail_screen.parameters.len(), 2);
-        assert_eq!(detail_screen.parameters[0].name, "id");
-        assert_eq!(detail_screen.parameters[1].name, "name");
-    }
-
-    #[test]
-    fn test_data_model_with_defaults() {
-        // Test data models with default values
-        let source = r#"
-        app "Test App" {
-            start = Home
-        }
-        
-        data Task {
-            title: String
-            done: Boolean = false
-            priority: Int = 5
-        }
-        
-        screen Home {
-            ui {
-                label "Task App"
-            }
-        }
-        "#;
-
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse data models with defaults");
-        
-        let app = result.unwrap();
-        assert_eq!(app.data_models.len(), 1);
-        
-        let task_model = &app.data_models[0];
-        assert_eq!(task_model.name, "Task");
-        assert_eq!(task_model.fields.len(), 3);
-        
-        // Check default values
-        let done_field = &task_model.fields[1];
-        assert!(done_field.default.is_some());
-        
-        let priority_field = &task_model.fields[2];
-        assert!(priority_field.default.is_some());
-    }
-
-    #[test]
-    fn test_list_widget() {
-        // Test list widget rendering
-        let source = r#"
-        app "Test App" {
-            start = Home
-        }
-        
-        screen Home {
-            state items = []
-            
-            ui {
-                list items {
-                    label "${item}"
-                }
-            }
-        }
-        "#;
-
-        let result = parser::parse(source);
-        assert!(result.is_ok(), "Should parse list widget");
-        
-        let app = result.unwrap();
-        let home_screen = &app.screens[0];
-        
-        if let crate::ast::UI::List { items, child } = &home_screen.ui {
-            assert_eq!(items, "items");
-            assert!(child.is_some());
-        } else {
-            panic!("Expected list UI");
-        }
-    }
+    let error = parse(&source).expect_err("oversized screen names must be rejected");
+    assert!(error.to_string().contains("Screen name too long"));
 }

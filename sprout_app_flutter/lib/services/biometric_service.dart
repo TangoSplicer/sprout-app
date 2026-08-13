@@ -3,19 +3,20 @@
 
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:local_auth/local_auth.dart';
+import 'package:local_auth/local_auth.dart' as local_auth;
 import 'package:local_auth_android/local_auth_android.dart';
 import 'package:local_auth_darwin/local_auth_darwin.dart';
 
 enum BiometricType { none, fingerprint, face, iris }
-enum BiometricResult { success, failed, canceled, error, not_available }
+
+enum BiometricResult { success, failed, canceled, error, notAvailable }
 
 class BiometricService {
   static final BiometricService _instance = BiometricService._internal();
   factory BiometricService() => _instance;
   BiometricService._internal();
 
-  final LocalAuthentication _auth = LocalAuthentication();
+  final local_auth.LocalAuthentication _auth = local_auth.LocalAuthentication();
   BiometricType _availableBiometric = BiometricType.none;
 
   // Security: Check biometric availability
@@ -31,11 +32,12 @@ class BiometricService {
 
       final availableBiometrics = await _auth.getAvailableBiometrics();
 
-      if (availableBiometrics.contains(BiometricType.face)) {
+      if (availableBiometrics.contains(local_auth.BiometricType.face)) {
         _availableBiometric = BiometricType.face;
-      } else if (availableBiometrics.contains(BiometricType.fingerprint)) {
+      } else if (availableBiometrics
+          .contains(local_auth.BiometricType.fingerprint)) {
         _availableBiometric = BiometricType.fingerprint;
-      } else if (availableBiometrics.contains(BiometricType.iris)) {
+      } else if (availableBiometrics.contains(local_auth.BiometricType.iris)) {
         _availableBiometric = BiometricType.iris;
       } else {
         _availableBiometric = BiometricType.none;
@@ -62,45 +64,15 @@ class BiometricService {
       }
 
       if (_availableBiometric == BiometricType.none) {
-        return BiometricResult.not_available;
+        return BiometricResult.notAvailable;
       }
-
-      // Security: Set up Android auth options
-      final androidAuthMessages = [
-        AndroidAuthMessages(
-          signInTitle: 'Sprout Authentication',
-          biometricHint: 'Touch sensor',
-          biometricNotRecognized: 'Biometric not recognized, try again',
-          biometricRequiredTitle: 'Biometric required',
-          biometricSuccess: 'Biometric recognized',
-          cancelButton: 'Cancel',
-          deviceCredentialsRequiredTitle: 'Device credentials required',
-          deviceCredentialsSetupDescription: 'Device credentials required',
-          goToButton: 'Go to settings',
-          goToSettingsButton: 'Go to settings',
-          goToSettingsDescription: 'Set up your device credentials',
-          settingsButton: 'Settings',
-          signInTitleiOS: 'Sprout Authentication',
-        ),
-      ];
-
-      // Security: Set up iOS auth options
-      final iOSAuthStrings = IOSAuthMessages(
-        cancelButton: 'Cancel',
-        goToSettingsButton: 'Go to settings',
-        goToSettingsDescription: 'Set up Face ID',
-        lockOut: 'Please unlock your phone to try again',
-        localizedFallbackTitle: 'Use Passcode',
-        notAvailable: 'Biometric not available',
-        reasonTitle: localizedReason,
-      );
 
       // Security: Authenticate
       final didAuthenticate = await _auth.authenticate(
         localizedReason: localizedReason,
         authMessages: [
-          AndroidAuthMessages(signInTitle: 'Sprout Authentication'),
-          IOSAuthMessages(cancelButton: 'Cancel'),
+          const AndroidAuthMessages(signInTitle: 'Sprout Authentication'),
+          const IOSAuthMessages(cancelButton: 'Cancel'),
         ],
         options: AuthenticationOptions(
           useErrorDialogs: useErrorDialogs,
@@ -113,9 +85,9 @@ class BiometricService {
     } on PlatformException catch (e) {
       // Security: Handle specific errors
       if (e.code == 'not_available') {
-        return BiometricResult.not_available;
+        return BiometricResult.notAvailable;
       } else if (e.code == 'not_enrolled') {
-        return BiometricResult.not_available;
+        return BiometricResult.notAvailable;
       } else if (e.code == 'locked_out' || e.code == 'permanently_locked_out') {
         return BiometricResult.error;
       } else if (e.code == 'user_canceled') {
@@ -152,7 +124,21 @@ class BiometricService {
   Future<List<BiometricType>> getAvailableTypes() async {
     try {
       final availableBiometrics = await _auth.getAvailableBiometrics();
-      return availableBiometrics;
+      return availableBiometrics
+          .map((type) {
+            if (type == local_auth.BiometricType.face) {
+              return BiometricType.face;
+            }
+            if (type == local_auth.BiometricType.fingerprint) {
+              return BiometricType.fingerprint;
+            }
+            if (type == local_auth.BiometricType.iris) {
+              return BiometricType.iris;
+            }
+            return BiometricType.none;
+          })
+          .where((type) => type != BiometricType.none)
+          .toList(growable: false);
     } catch (e) {
       return [];
     }
@@ -186,11 +172,12 @@ class BiometricService {
     final isAvailable = await _auth.canCheckBiometrics;
     final isSupported = await _auth.isDeviceSupported();
     final availableBiometrics = await _auth.getAvailableBiometrics();
-    
+
     return {
       'is_available': isAvailable,
       'is_supported': isSupported,
-      'available_biometrics': availableBiometrics.map((e) => e.toString()).toList(),
+      'available_biometrics':
+          availableBiometrics.map((e) => e.toString()).toList(),
       'current_biometric': _availableBiometric.toString(),
     };
   }

@@ -105,8 +105,7 @@ class AuditService {
   /// Get audit events for a time range
   List<AuditEvent> getEventsInRange(DateTime start, DateTime end) {
     return _events.where((event) {
-      return event.timestamp.isAfter(start) && 
-             event.timestamp.isBefore(end);
+      return event.timestamp.isAfter(start) && event.timestamp.isBefore(end);
     }).toList();
   }
 
@@ -133,9 +132,9 @@ class AuditService {
       'UNAUTHORIZED_ACCESS',
     ];
 
-    return _events.where((event) => 
-      securityTypes.contains(event.eventType)
-    ).toList();
+    return _events
+        .where((event) => securityTypes.contains(event.eventType))
+        .toList();
   }
 
   /// Generate audit report
@@ -156,7 +155,7 @@ class AuditService {
 
     final eventTypeCounts = <String, int>{};
     for (var event in events) {
-      eventTypeCounts[event.eventType] = 
+      eventTypeCounts[event.eventType] =
           (eventTypeCounts[event.eventType] ?? 0) + 1;
     }
 
@@ -169,11 +168,12 @@ class AuditService {
       'userId': userId,
       'totalEvents': events.length,
       'eventTypeCounts': eventTypeCounts,
-      'securityEvents': events.where((e) => 
-        e.eventType.contains('SECURITY') || 
-        e.eventType.contains('AUTH') ||
-        e.eventType.contains('PERMISSION')
-      ).length,
+      'securityEvents': events
+          .where((e) =>
+              e.eventType.contains('SECURITY') ||
+              e.eventType.contains('AUTH') ||
+              e.eventType.contains('PERMISSION'))
+          .length,
     };
   }
 
@@ -191,7 +191,8 @@ class AuditService {
       'events': events.map((e) => e.toJson()).toList(),
     };
 
-    final fileName = 'audit_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json';
+    final fileName =
+        'audit_export_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.json';
     final file = File('${_auditDirectory.path}/$fileName');
 
     await file.writeAsString(jsonEncode(exportData));
@@ -289,22 +290,20 @@ class AuditService {
     final oneHourAgo = now.subtract(const Duration(hours: 1));
     final recentEvents = getEventsInRange(oneHourAgo, now);
 
-    final loginFailures = recentEvents.where((e) => 
-      e.eventType == 'LOGIN_FAILURE'
-    ).length;
+    final loginFailures =
+        recentEvents.where((e) => e.eventType == 'LOGIN_FAILURE').length;
 
-    final unauthorizedAccess = recentEvents.where((e) => 
-      e.eventType == 'UNAUTHORIZED_ACCESS' || 
-      e.eventType == 'PERMISSION_DENIED'
-    ).length;
+    final unauthorizedAccess = recentEvents
+        .where((e) =>
+            e.eventType == 'UNAUTHORIZED_ACCESS' ||
+            e.eventType == 'PERMISSION_DENIED')
+        .length;
 
-    final securityViolations = recentEvents.where((e) => 
-      e.eventType == 'SECURITY_VIOLATION'
-    ).length;
+    final securityViolations =
+        recentEvents.where((e) => e.eventType == 'SECURITY_VIOLATION').length;
 
-    final isSuspicious = loginFailures > 5 || 
-                       unauthorizedAccess > 3 || 
-                       securityViolations > 0;
+    final isSuspicious =
+        loginFailures > 5 || unauthorizedAccess > 3 || securityViolations > 0;
 
     return {
       'isSuspicious': isSuspicious,

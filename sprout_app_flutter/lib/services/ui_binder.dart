@@ -12,7 +12,8 @@ class UIBinder {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('Count: ${state['count']}', style: const TextStyle(fontSize: 48)),
+          Text('Count: ${state['count']}',
+              style: const TextStyle(fontSize: 48)),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () => onAction('count = count + 1'),

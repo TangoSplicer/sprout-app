@@ -1,178 +1,173 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
+
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pointycastle/export.dart';
 
 class EncryptionService {
   static final EncryptionService _instance = EncryptionService._internal();
+  static const _masterKeyStorageKey = 'sprout.encryption.master_key.v1';
+
   factory EncryptionService() => _instance;
+
   EncryptionService._internal();
 
-  // AES-256 key (32 bytes)
-  late encrypt.Key _aesKey;
-  
-  // Initialization vector (16 bytes)
-  late encrypt.IV _iv;
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
 
-  /// Initialize encryption service with a master key
-  void initialize(String masterKey) {
-    // Derive a 256-bit key from the master key using SHA-256
+  Future<void> initialize(String masterKey) async {
     final keyBytes = sha256.convert(utf8.encode(masterKey)).bytes;
-    _aesKey = encrypt.Key(Uint8List.fromList(keyBytes));
-    
-    // Generate a random IV
-    _iv = encrypt.IV.fromLength(16);
+    await _storage.write(
+      key: _masterKeyStorageKey,
+      value: base64Encode(keyBytes),
+    );
   }
 
-  /// Initialize with secure random key
-  void initializeWithRandomKey() {
-    final random = SecureRandom('AES/CTR/AUTO-PRNG');
-    random.seed(KeyParameter(Platform.instance.platformEntropy()));
-    
-    final keyBytes = Uint8List(32);
-    for (var i = 0; i < keyBytes.length; i++) {
-      keyBytes[i] = random.nextUint8();
+  Future<void> initializeWithRandomKey() async {
+    await _storage.write(
+      key: _masterKeyStorageKey,
+      value: base64Encode(_secureBytes(32)),
+    );
+  }
+
+  /// Encrypt text using AES-256-GCM. Each value has a fresh 96-bit nonce and
+  /// carries its authentication tag in the encrypted payload.
+  Future<String> encryptText(String plainText) async {
+    final key = await _getKey();
+    final nonce = _secureBytes(12);
+    final encrypter =
+        encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.gcm));
+    final ciphertext = encrypter.encrypt(plainText, iv: encrypt.IV(nonce));
+    return jsonEncode({
+      'version': 1,
+      'nonce': base64Encode(nonce),
+      'ciphertext': ciphertext.base64,
+    });
+  }
+
+  Future<String> decryptText(String encryptedText) async {
+    final envelope = _decodeEnvelope(encryptedText);
+    final key = await _getKey();
+    final encrypter =
+        encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.gcm));
+    try {
+      return encrypter.decrypt64(
+        envelope.ciphertext,
+        iv: encrypt.IV(envelope.nonce),
+      );
+    } on ArgumentError {
+      throw const FormatException('Encrypted payload failed authentication');
     }
-    
-    _aesKey = encrypt.Key(keyBytes);
-    
-    final ivBytes = Uint8List(16);
-    for (var i = 0; i < ivBytes.length; i++) {
-      ivBytes[i] = random.nextUint8();
-    }
-    
-    _iv = encrypt.IV(ivBytes);
   }
 
-  /// Encrypt text using AES-256-CBC
-  String encryptText(String plainText) {
-    final encrypter = encrypt.Encrypter(
-      encrypt.AES(_aesKey, mode: encrypt.AESMode.cbc),
-    );
-    
-    final encrypted = encrypter.encrypt(plainText, iv: _iv);
-    return encrypted.base64;
+  Future<Uint8List> encryptData(Uint8List data) async {
+    final envelope = await encryptText(base64Encode(data));
+    return Uint8List.fromList(utf8.encode(envelope));
   }
 
-  /// Decrypt text using AES-256-CBC
-  String decryptText(String encryptedText) {
-    final encrypter = encrypt.Encrypter(
-      encrypt.AES(_aesKey, mode: encrypt.AESMode.cbc),
-    );
-    
-    final encrypted = encrypt.Encrypted.fromBase64(encryptedText);
-    final decrypted = encrypter.decrypt(encrypted, iv: _iv);
-    return decrypted;
+  Future<Uint8List> decryptData(Uint8List encryptedData) async {
+    final plaintext = await decryptText(utf8.decode(encryptedData));
+    return Uint8List.fromList(base64Decode(plaintext));
   }
 
-  /// Encrypt data using AES-256-CBC
-  Uint8List encryptData(Uint8List data) {
-    final encrypter = encrypt.Encrypter(
-      encrypt.AES(_aesKey, mode: encrypt.AESMode.cbc),
-    );
-    
-    final encrypted = encrypter.encryptBytes(data, iv: _iv);
-    return encrypted.bytes;
-  }
+  Future<String> encryptJson(Map<String, dynamic> jsonData) =>
+      encryptText(jsonEncode(jsonData));
 
-  /// Decrypt data using AES-256-CBC
-  Uint8List decryptData(Uint8List encryptedData) {
-    final encrypter = encrypt.Encrypter(
-      encrypt.AES(_aesKey, mode: encrypt.AESMode.cbc),
-    );
-    
-    final encrypted = encrypt.Encrypted(encryptedData);
-    final decrypted = encrypter.decryptBytes(encrypted, iv: _iv);
-    return Uint8List.fromList(decrypted);
-  }
+  Future<Map<String, dynamic>> decryptJson(String encryptedJson) async =>
+      jsonDecode(await decryptText(encryptedJson)) as Map<String, dynamic>;
 
-  /// Encrypt JSON object
-  String encryptJson(Map<String, dynamic> jsonData) {
-    final jsonString = jsonEncode(jsonData);
-    return encryptText(jsonString);
-  }
+  String generateHash(String input) =>
+      sha256.convert(utf8.encode(input)).toString();
 
-  /// Decrypt JSON object
-  Map<String, dynamic> decryptJson(String encryptedJson) {
-    final jsonString = decryptText(encryptedJson);
-    return jsonDecode(jsonString) as Map<String, dynamic>;
-  }
+  String generateHashBytes(Uint8List data) => sha256.convert(data).toString();
 
-  /// Generate SHA-256 hash
-  String generateHash(String input) {
-    final bytes = utf8.encode(input);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
-  }
-
-  /// Generate SHA-256 hash of bytes
-  String generateHashBytes(Uint8List data) {
-    final digest = sha256.convert(data);
-    return digest.toString();
-  }
-
-  /// Generate random salt
   String generateSalt({int length = 32}) {
-    final random = SecureRandom('AES/CTR/AUTO-PRNG');
-    random.seed(KeyParameter(Platform.instance.platformEntropy()));
-    
-    final saltBytes = Uint8List(length);
-    for (var i = 0; i < saltBytes.length; i++) {
-      saltBytes[i] = random.nextUint8();
+    if (length < 16 || length > 1024) {
+      throw ArgumentError.value(
+          length, 'length', 'Must be between 16 and 1024');
     }
-    
-    return base64Encode(saltBytes);
+    return base64Encode(_secureBytes(length));
   }
 
-  /// Derive key from password using PBKDF2
-  String deriveKey(String password, String salt, {int iterations = 10000}) {
-    final key = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
-    
-    final saltBytes = base64Decode(salt);
-    final passwordBytes = utf8.encode(password);
-    
-    key.init(Pbkdf2Parameters(
-      Uint8List.fromList(saltBytes),
-      iterations,
-      32, // 256-bit key
-    ));
-    
-    final derivedBytes = Uint8List(32);
-    key.deriveKey(
-      Uint8List.fromList(passwordBytes),
-      0,
-      derivedBytes,
-      0,
-      false,
-    );
-    
-    return base64Encode(derivedBytes);
+  String deriveKey(String password, String salt, {int iterations = 210000}) {
+    if (iterations < 100000) {
+      throw ArgumentError.value(
+          iterations, 'iterations', 'Use at least 100,000 iterations');
+    }
+    final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
+      ..init(Pbkdf2Parameters(base64Decode(salt), iterations, 32));
+    final output = Uint8List(32);
+    derivator.deriveKey(
+        Uint8List.fromList(utf8.encode(password)), 0, output, 0);
+    return base64Encode(output);
   }
 
-  /// Verify HMAC signature
   bool verifyHmac(String message, String signature, String key) {
-    final hmac = Hmac(sha256, utf8.encode(key));
-    final digest = hmac.convert(utf8.encode(message));
-    final computedSignature = digest.toString();
-    
-    return computedSignature == signature;
+    final expected = generateHmac(message, key);
+    return _constantTimeEquals(utf8.encode(expected), utf8.encode(signature));
   }
 
-  /// Generate HMAC signature
-  String generateHmac(String message, String key) {
-    final hmac = Hmac(sha256, utf8.encode(key));
-    final digest = hmac.convert(utf8.encode(message));
-    return digest.toString();
+  String generateHmac(String message, String key) =>
+      Hmac(sha256, utf8.encode(key)).convert(utf8.encode(message)).toString();
+
+  Future<String> getKey() async => base64Encode((await _getKey()).bytes);
+
+  Future<String> getIV() async => throw UnsupportedError(
+      'AES-GCM uses a distinct nonce for each encryption operation');
+
+  Future<encrypt.Key> _getKey() async {
+    var encoded = await _storage.read(key: _masterKeyStorageKey);
+    if (encoded == null) {
+      encoded = base64Encode(_secureBytes(32));
+      await _storage.write(key: _masterKeyStorageKey, value: encoded);
+    }
+    final bytes = base64Decode(encoded);
+    if (bytes.length != 32) {
+      throw const FormatException('Invalid persisted encryption key');
+    }
+    return encrypt.Key(Uint8List.fromList(bytes));
   }
 
-  /// Get current key (for testing purposes only)
-  String getKey() {
-    return base64Encode(_aesKey.bytes);
+  _EncryptionEnvelope _decodeEnvelope(String encoded) {
+    final decoded = jsonDecode(encoded);
+    if (decoded is! Map<String, dynamic> || decoded['version'] != 1) {
+      throw const FormatException('Unsupported encrypted payload');
+    }
+    final nonce = base64Decode(decoded['nonce'] as String);
+    if (nonce.length != 12) {
+      throw const FormatException('Invalid AES-GCM nonce');
+    }
+    return _EncryptionEnvelope(
+      nonce: Uint8List.fromList(nonce),
+      ciphertext: decoded['ciphertext'] as String,
+    );
   }
 
-  /// Get current IV (for testing purposes only)
-  String getIV() {
-    return base64Encode(_iv.bytes);
+  Uint8List _secureBytes(int length) {
+    final random = Random.secure();
+    return Uint8List.fromList(
+      List<int>.generate(length, (_) => random.nextInt(256)),
+    );
   }
+
+  bool _constantTimeEquals(List<int> left, List<int> right) {
+    if (left.length != right.length) return false;
+    var difference = 0;
+    for (var index = 0; index < left.length; index++) {
+      difference |= left[index] ^ right[index];
+    }
+    return difference == 0;
+  }
+}
+
+class _EncryptionEnvelope {
+  final Uint8List nonce;
+  final String ciphertext;
+
+  const _EncryptionEnvelope({required this.nonce, required this.ciphertext});
 }

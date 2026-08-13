@@ -1,5 +1,5 @@
-import 'dart:io';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart'
+    as permission_handler;
 
 enum PermissionType {
   camera,
@@ -43,10 +43,10 @@ class PermissionService {
 
   /// Get current status of a permission
   Future<PermissionStatus> checkPermission(PermissionType type) async {
-    Permission permission = _mapPermissionType(type);
-    Permission.Status status = await permission.status;
+    final permission = _mapPermissionType(type);
+    final status = await permission.status;
 
-    PermissionStatus mappedStatus = _mapPermissionStatus(status);
+    final mappedStatus = _mapPermissionStatus(status);
     _permissionStatus[type] = mappedStatus;
 
     return mappedStatus;
@@ -54,10 +54,10 @@ class PermissionService {
 
   /// Request a single permission
   Future<PermissionStatus> requestPermission(PermissionType type) async {
-    Permission permission = _mapPermissionType(type);
-    Permission.Status status = await permission.request();
+    final permission = _mapPermissionType(type);
+    final status = await permission.request();
 
-    PermissionStatus mappedStatus = _mapPermissionStatus(status);
+    final mappedStatus = _mapPermissionStatus(status);
     _permissionStatus[type] = mappedStatus;
 
     return mappedStatus;
@@ -65,8 +65,7 @@ class PermissionService {
 
   /// Request multiple permissions
   Future<Map<PermissionType, PermissionStatus>> requestMultiplePermissions(
-    List<PermissionType> types
-  ) async {
+      List<PermissionType> types) async {
     final Map<PermissionType, PermissionStatus> results = {};
 
     for (var type in types) {
@@ -78,7 +77,8 @@ class PermissionService {
   }
 
   /// Check if all required permissions are granted
-  Future<bool> checkRequiredPermissions(List<PermissionRequest> requests) async {
+  Future<bool> checkRequiredPermissions(
+      List<PermissionRequest> requests) async {
     for (var request in requests) {
       if (request.isRequired) {
         final status = await checkPermission(request.type);
@@ -92,14 +92,12 @@ class PermissionService {
 
   /// Request permissions with user-friendly flow
   Future<Map<PermissionType, PermissionStatus>> requestPermissionsWithFlow(
-    List<PermissionRequest> requests
-  ) async {
+      List<PermissionRequest> requests) async {
     final results = <PermissionType, PermissionStatus>{};
 
     // Check current status first
-    final statusCheck = await Future.wait(
-      requests.map((r) => checkPermission(r.type))
-    );
+    final statusCheck =
+        await Future.wait(requests.map((r) => checkPermission(r.type)));
 
     // Only request permissions that aren't already granted
     final needsRequest = <PermissionRequest>[];
@@ -125,12 +123,12 @@ class PermissionService {
 
   /// Open app settings for user to manually grant permissions
   Future<bool> openAppSettings() async {
-    return await openAppSettings();
+    return permission_handler.openAppSettings();
   }
 
   /// Check if permission should show rationale
   Future<bool> shouldShowRationale(PermissionType type) async {
-    Permission permission = _mapPermissionType(type);
+    final permission = _mapPermissionType(type);
     return await permission.shouldShowRequestRationale;
   }
 
@@ -161,28 +159,28 @@ class PermissionService {
     final neededPermissions = <PermissionType>[];
 
     // Camera detection
-    if (sourceCode.contains('camera') || 
+    if (sourceCode.contains('camera') ||
         sourceCode.contains('takePicture') ||
         sourceCode.contains('startVideoRecording')) {
       neededPermissions.add(PermissionType.camera);
     }
 
     // Microphone detection
-    if (sourceCode.contains('microphone') || 
+    if (sourceCode.contains('microphone') ||
         sourceCode.contains('audio') ||
         sourceCode.contains('recorder')) {
       neededPermissions.add(PermissionType.microphone);
     }
 
     // Location detection
-    if (sourceCode.contains('location') || 
+    if (sourceCode.contains('location') ||
         sourceCode.contains('geolocation') ||
         sourceCode.contains('GPS')) {
       neededPermissions.add(PermissionType.location);
     }
 
     // Storage detection
-    if (sourceCode.contains('file') || 
+    if (sourceCode.contains('file') ||
         sourceCode.contains('storage') ||
         sourceCode.contains('save') ||
         sourceCode.contains('load')) {
@@ -190,27 +188,26 @@ class PermissionService {
     }
 
     // Photos detection
-    if (sourceCode.contains('photo') || 
+    if (sourceCode.contains('photo') ||
         sourceCode.contains('image') ||
         sourceCode.contains('gallery')) {
       neededPermissions.add(PermissionType.photos);
     }
 
     // Notifications detection
-    if (sourceCode.contains('notification') || 
+    if (sourceCode.contains('notification') ||
         sourceCode.contains('alert') ||
         sourceCode.contains('push')) {
       neededPermissions.add(PermissionType.notifications);
     }
 
     // Contacts detection
-    if (sourceCode.contains('contact') || 
-        sourceCode.contains('address')) {
+    if (sourceCode.contains('contact') || sourceCode.contains('address')) {
       neededPermissions.add(PermissionType.contacts);
     }
 
     // Calendar detection
-    if (sourceCode.contains('calendar') || 
+    if (sourceCode.contains('calendar') ||
         sourceCode.contains('event') ||
         sourceCode.contains('schedule')) {
       neededPermissions.add(PermissionType.calendar);
@@ -236,7 +233,8 @@ class PermissionService {
       'requestedPermissions': requested.map((p) => p.name).toList(),
       'neededPermissions': needed.map((p) => p.name).toList(),
       'missingPermissions': missingPermissions.map((p) => p.name).toList(),
-      'unnecessaryPermissions': unnecessaryPermissions.map((p) => p.name).toList(),
+      'unnecessaryPermissions':
+          unnecessaryPermissions.map((p) => p.name).toList(),
       'warnings': [
         if (missingPermissions.isNotEmpty)
           'Missing permissions: ${missingPermissions.map((p) => p.name).join(", ")}',
@@ -257,42 +255,41 @@ class PermissionService {
   }
 
   /// Map PermissionType to Permission
-  Permission _mapPermissionType(PermissionType type) {
+  permission_handler.Permission _mapPermissionType(PermissionType type) {
     switch (type) {
       case PermissionType.camera:
-        return Permission.camera;
+        return permission_handler.Permission.camera;
       case PermissionType.microphone:
-        return Permission.microphone;
+        return permission_handler.Permission.microphone;
       case PermissionType.location:
-        return Permission.location;
+        return permission_handler.Permission.location;
       case PermissionType.storage:
-        return Permission.storage;
+        return permission_handler.Permission.storage;
       case PermissionType.photos:
-        return Permission.photos;
+        return permission_handler.Permission.photos;
       case PermissionType.notifications:
-        return Permission.notifications;
+        return permission_handler.Permission.notification;
       case PermissionType.contacts:
-        return Permission.contacts;
+        return permission_handler.Permission.contacts;
       case PermissionType.calendar:
-        return Permission.calendar;
+        return permission_handler.Permission.calendarFullAccess;
     }
   }
 
   /// Map Permission.Status to PermissionStatus
-  PermissionStatus _mapPermissionStatus(Permission.Status status) {
+  PermissionStatus _mapPermissionStatus(
+      permission_handler.PermissionStatus status) {
     switch (status) {
-      case Permission.Status.granted:
+      case permission_handler.PermissionStatus.granted:
+      case permission_handler.PermissionStatus.limited:
+      case permission_handler.PermissionStatus.provisional:
         return PermissionStatus.granted;
-      case Permission.Status.denied:
+      case permission_handler.PermissionStatus.denied:
         return PermissionStatus.denied;
-      case PermissionStatus.permanentlyDenied:
+      case permission_handler.PermissionStatus.permanentlyDenied:
         return PermissionStatus.permanentlyDenied;
-      case PermissionStatus.restricted:
+      case permission_handler.PermissionStatus.restricted:
         return PermissionStatus.restricted;
-      case PermissionStatus.limited:
-        return PermissionStatus.granted;
-      case PermissionStatus.provisional:
-        return PermissionStatus.granted;
     }
   }
 }

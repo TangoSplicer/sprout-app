@@ -1,12 +1,35 @@
+name: Flutter Quality
+
+on:
+  push:
+    branches: [main, production-ready]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-quality-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
+    name: Analyze and test Flutter application
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: stable
+          cache: true
       - run: flutter pub get
-        working-directory: ./flutter # Add this to EVERY flutter command
-      - run: flutter analyze
-        working-directory: ./flutter
-      - run: flutter test integration_test/integration_tests.dart
-        working-directory: ./flutter
+        working-directory: ./sprout_app_flutter
+      - run: dart format --set-exit-if-changed lib test
+        working-directory: ./sprout_app_flutter
+      - run: flutter analyze --no-fatal-infos
+        working-directory: ./sprout_app_flutter
+      - run: flutter test test
+        working-directory: ./sprout_app_flutter

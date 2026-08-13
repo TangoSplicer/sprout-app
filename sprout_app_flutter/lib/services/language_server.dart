@@ -3,22 +3,25 @@ import 'dart:convert';
 import '../generated_bridge.dart' as bridge;
 
 class LanguageServerClient {
-  static final LanguageServerClient _instance = LanguageServerClient._internal();
+  static final LanguageServerClient _instance =
+      LanguageServerClient._internal();
   factory LanguageServerClient() => _instance;
   LanguageServerClient._internal();
 
-  final StreamController<List<Diagnostic>> _diagnosticsController = StreamController<List<Diagnostic>>.broadcast();
-  final StreamController<List<CompletionItem>> _completionsController = StreamController<List<CompletionItem>>.broadcast();
-  
+  final StreamController<List<Diagnostic>> _diagnosticsController =
+      StreamController<List<Diagnostic>>.broadcast();
+  final StreamController<List<CompletionItem>> _completionsController =
+      StreamController<List<CompletionItem>>.broadcast();
+
   Timer? _debounceTimer;
   String _currentDocument = '';
-  
+
   Stream<List<Diagnostic>> get diagnostics => _diagnosticsController.stream;
   Stream<List<CompletionItem>> get completions => _completionsController.stream;
 
   Future<void> notifyChange(String document) async {
     _currentDocument = document;
-    
+
     // Debounce changes to avoid excessive processing
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
@@ -29,9 +32,10 @@ class LanguageServerClient {
   Future<void> _processDiagnostics() async {
     try {
       // Use the Rust bridge to parse and analyze the document
-      final parseResult = bridge.getCompiler().parseSproutScript(_currentDocument);
+      final parseResult =
+          bridge.getCompiler().parseSproutScript(_currentDocument);
       final diagnostics = _extractDiagnosticsFromParseResult(parseResult);
-      
+
       _diagnosticsController.add(diagnostics);
     } catch (e) {
       // Handle parse errors
@@ -47,10 +51,10 @@ class LanguageServerClient {
 
   List<Diagnostic> _extractDiagnosticsFromParseResult(String parseResult) {
     final diagnostics = <Diagnostic>[];
-    
+
     try {
       final json = jsonDecode(parseResult);
-      
+
       // Extract errors
       if (json is Map && json.containsKey('errors')) {
         final errors = json['errors'] as List?;
@@ -65,7 +69,7 @@ class LanguageServerClient {
           }
         }
       }
-      
+
       // Extract warnings
       if (json is Map && json.containsKey('warnings')) {
         final warnings = json['warnings'] as List?;
@@ -80,7 +84,6 @@ class LanguageServerClient {
           }
         }
       }
-      
     } catch (e) {
       // Fallback error diagnostic
       diagnostics.add(Diagnostic(
@@ -90,11 +93,12 @@ class LanguageServerClient {
         source: 'sprout-language-server',
       ));
     }
-    
+
     return diagnostics;
   }
 
-  Future<List<CompletionItem>> getCompletions(String document, int position) async {
+  Future<List<CompletionItem>> getCompletions(
+      String document, int position) async {
     // Analyze context around cursor position
     final context = _analyzeContext(document, position);
     return _generateCompletions(context);
@@ -108,52 +112,53 @@ class LanguageServerClient {
     final beforeCursor = document.substring(0, position);
     final lines = beforeCursor.split('\n');
     final currentLine = lines.last;
-    
+
     // Determine context based on current line content
     if (currentLine.trim().isEmpty) {
       return CompletionContext.topLevel;
     }
-    
+
     if (currentLine.contains('app ')) {
       return CompletionContext.appDeclaration;
     }
-    
+
     if (currentLine.contains('screen ')) {
       return CompletionContext.screenDeclaration;
     }
-    
+
     if (currentLine.contains('ui {') || beforeCursor.contains('ui {')) {
       return CompletionContext.uiBlock;
     }
-    
+
     if (currentLine.contains('state ')) {
       return CompletionContext.stateDeclaration;
     }
-    
+
     return CompletionContext.general;
   }
 
   List<CompletionItem> _generateCompletions(CompletionContext context) {
     final completions = <CompletionItem>[];
-    
+
     switch (context) {
       case CompletionContext.topLevel:
         completions.addAll([
-          CompletionItem(
+          const CompletionItem(
             label: 'app',
             kind: CompletionItemKind.keyword,
             detail: 'Application declaration',
             insertText: 'app "\${1:MyApp}" {\n  start = "\${2:Home}"\n}',
             documentation: 'Creates a new Sprout application',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'screen',
             kind: CompletionItemKind.keyword,
             detail: 'Screen declaration',
-            insertText: 'screen \${1:ScreenName} {\n  ui {\n    \${2:label "Hello World"}\n  }\n}',
+            insertText:
+                'screen \${1:ScreenName} {\n  ui {\n    \${2:label "Hello World"}\n  }\n}',
             documentation: 'Creates a new screen in your app',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'data',
             kind: CompletionItemKind.keyword,
             detail: 'Data model declaration',
@@ -162,59 +167,59 @@ class LanguageServerClient {
           ),
         ]);
         break;
-        
+
       case CompletionContext.uiBlock:
         completions.addAll([
-          CompletionItem(
+          const CompletionItem(
             label: 'label',
             kind: CompletionItemKind.function,
             detail: 'Text label',
             insertText: 'label "\${1:Text}"',
             documentation: 'Displays text on the screen',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'button',
             kind: CompletionItemKind.function,
             detail: 'Interactive button',
             insertText: 'button "\${1:Click me}" {\n  \${2:// action code}\n}',
             documentation: 'Creates a clickable button',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'column',
             kind: CompletionItemKind.function,
             detail: 'Vertical layout',
             insertText: 'column {\n  \${1:// child elements}\n}',
             documentation: 'Arranges children vertically',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'row',
             kind: CompletionItemKind.function,
             detail: 'Horizontal layout',
             insertText: 'row {\n  \${1:// child elements}\n}',
             documentation: 'Arranges children horizontally',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'input',
             kind: CompletionItemKind.function,
             detail: 'Text input field',
             insertText: 'input "\${1:Label}" binding: \${2:variableName}',
             documentation: 'Creates a text input field',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'image',
             kind: CompletionItemKind.function,
             detail: 'Image display',
             insertText: 'image "\${1:path/to/image.png}"',
             documentation: 'Displays an image',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'list',
             kind: CompletionItemKind.function,
             detail: 'Scrollable list',
             insertText: 'list \${1:items} {\n  \${2:// list item template}\n}',
             documentation: 'Creates a scrollable list',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'if',
             kind: CompletionItemKind.keyword,
             detail: 'Conditional rendering',
@@ -223,31 +228,31 @@ class LanguageServerClient {
           ),
         ]);
         break;
-        
+
       case CompletionContext.stateDeclaration:
         completions.addAll([
-          CompletionItem(
+          const CompletionItem(
             label: 'String',
             kind: CompletionItemKind.typeParameter,
             detail: 'Text data type',
             insertText: 'String = "\${1:default value}"',
             documentation: 'String data type for text',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'Int',
             kind: CompletionItemKind.typeParameter,
             detail: 'Integer data type',
             insertText: 'Int = \${1:0}',
             documentation: 'Integer data type for numbers',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'Boolean',
             kind: CompletionItemKind.typeParameter,
             detail: 'Boolean data type',
             insertText: 'Boolean = \${1:false}',
             documentation: 'Boolean data type for true/false',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'Float',
             kind: CompletionItemKind.typeParameter,
             detail: 'Decimal number data type',
@@ -256,18 +261,18 @@ class LanguageServerClient {
           ),
         ]);
         break;
-        
+
       case CompletionContext.general:
         // Add general completions that work in most contexts
         completions.addAll([
-          CompletionItem(
+          const CompletionItem(
             label: 'true',
             kind: CompletionItemKind.value,
             detail: 'Boolean true value',
             insertText: 'true',
             documentation: 'Boolean true constant',
           ),
-          CompletionItem(
+          const CompletionItem(
             label: 'false',
             kind: CompletionItemKind.value,
             detail: 'Boolean false value',
@@ -276,11 +281,11 @@ class LanguageServerClient {
           ),
         ]);
         break;
-        
+
       default:
         break;
     }
-    
+
     return completions;
   }
 
@@ -383,14 +388,17 @@ class TextRange {
   const TextRange(this.start, this.end);
 
   int get length => end - start;
-  
+
   @override
   String toString() => '[$start, $end]';
-  
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TextRange && runtimeType == other.runtimeType && start == other.start && end == other.end;
+      other is TextRange &&
+          runtimeType == other.runtimeType &&
+          start == other.start &&
+          end == other.end;
 
   @override
   int get hashCode => start.hashCode ^ end.hashCode;

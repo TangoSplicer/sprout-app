@@ -46,7 +46,8 @@ class _AIScreenState extends State<AIScreen> {
                           _loading = true;
                           _generatedCode = '';
                         });
-                        final code = await AIAssistant().generate(_promptController.text);
+                        final code = await AIAssistant()
+                            .generate(_promptController.text);
                         setState(() {
                           _generatedCode = code;
                           _loading = false;
@@ -57,13 +58,15 @@ class _AIScreenState extends State<AIScreen> {
             const SizedBox(height: 24),
             if (_loading) const LinearProgressIndicator(),
             if (_generatedCode.isNotEmpty) ...[
-              const Text('Generated Code:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Generated Code:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Expanded(
                 child: SingleChildScrollView(
                   child: SelectableText(
                     _generatedCode,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                    style:
+                        const TextStyle(fontFamily: 'monospace', fontSize: 14),
                   ),
                 ),
               ),
@@ -73,13 +76,14 @@ class _AIScreenState extends State<AIScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        await ProjectService().writeFile(widget.projectName, 'main.sprout', _generatedCode);
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Code saved!')),
-                          );
-                        }
+                        final messenger = ScaffoldMessenger.of(context);
+                        await ProjectService().writeFile(
+                            widget.projectName, 'main.sprout', _generatedCode);
+                        if (!context.mounted) return;
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('Code saved!')),
+                        );
+                        Navigator.pop(context);
                       },
                       child: const Text('Save & Close'),
                     ),

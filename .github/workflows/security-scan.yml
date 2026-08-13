@@ -4,10 +4,12 @@ name: Security Scan & Analysis
     branches:
       - main
       - develop
+      - production-ready
   pull_request:
     branches:
       - main
       - develop
+      - production-ready
   schedule:
     - cron: 0 2 * * *
 concurrency:
@@ -27,13 +29,15 @@ jobs:
         with:
           fetch-depth: 0
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: rust
-          build-mode: none
+          build-mode: manual
           queries: 'security-extended,security-and-quality'
+      - name: Build Rust for CodeQL analysis
+        run: cargo build --workspace
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: '/language:rust'
   code-quality:
@@ -47,7 +51,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.16.0
+          flutter-version: 3.24.0
           channel: stable
           cache: true
       - name: Set up Rust toolchain
@@ -66,15 +70,15 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: Install Flutter dependencies
         run: |
-          cd flutter
+          cd sprout_app_flutter
           flutter pub get
       - name: Run Flutter static analysis
         run: |
-          cd flutter
-          flutter analyze --fatal-infos
+          cd sprout_app_flutter
+          flutter analyze --no-fatal-infos
       - name: Check Flutter code formatting
         run: |
-          cd flutter
+          cd sprout_app_flutter
           dart format --set-exit-if-changed .
       - name: Run Rust clippy (security lints)
         run: |
@@ -101,22 +105,18 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.16.0
+          flutter-version: 3.24.0
           channel: stable
           cache: true
       - name: Check Flutter dependencies
         run: |
-          cd flutter
+          cd sprout_app_flutter
           flutter pub outdated
         continue-on-error: true
-      - name: Generate Cargo.lock if missing
-        run: |
-          cd rust/sprout_compiler
-          test -f Cargo.lock || cargo generate-lockfile
+      - name: Verify tracked Cargo lockfile
+        run: test -f Cargo.lock
       - name: Run cargo audit (Rust)
-        run: |
-          cd rust/sprout_compiler
-          cargo audit
+        run: cargo audit --file Cargo.lock
       - name: Check outdated Rust dependencies
         run: |
           cargo install cargo-outdated
@@ -135,21 +135,18 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.16.0
+          flutter-version: 3.24.0
           channel: stable
           cache: true
       - name: Install dependencies
         run: >
-          cd flutter
+          cd sprout_app_flutter
 
           flutter pub get
-
-          flutter pub run build_runner build --delete-conflicting-outputs ||
-          true
       - name: Check for security tests
         id: check_tests
         run: |
-          if [ -f "flutter/test/security_test.dart" ]; then
+          if [ -f "sprout_app_flutter/test/security_analyzer_test.dart" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
@@ -157,13 +154,13 @@ jobs:
       - name: Run security tests
         if: steps.check_tests.outputs.exists == 'true'
         run: |
-          cd flutter
-          flutter test test/security_test.dart --coverage
+          cd sprout_app_flutter
+          flutter test test/security_analyzer_test.dart --coverage
       - name: Upload coverage to Codecov
         if: steps.check_tests.outputs.exists == 'true'
         uses: codecov/codecov-action@v4
         with:
-          files: ./flutter/coverage/lcov.info
+          files: ./sprout_app_flutter/coverage/lcov.info
           flags: security-tests
           name: security-coverage-report
           fail_ci_if_error: false

@@ -1,11 +1,13 @@
 // flutter/lib/services/secure_export.dart
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:pointycastle/export.dart';
 import 'e2ee.dart';
 import 'project_service.dart';
 
 class SecureExport {
-  static Future<File> exportEncrypted(String projectName, ECPublicKey recipientKey) async {
+  static Future<File> exportEncrypted(
+      String projectName, ECPublicKey recipientKey) async {
     final content = await ProjectService().readFile(projectName, 'main.sprout');
     final encrypted = await E2EE().encrypt(content, recipientKey);
 
@@ -14,7 +16,8 @@ class SecureExport {
     return file;
   }
 
-  static Future<void> importEncrypted(File file, String newName, ECPrivateKey myKey, ECPublicKey senderKey) async {
+  static Future<void> importEncrypted(File file, String newName,
+      ECPrivateKey myKey, ECPublicKey senderKey) async {
     final encrypted = await file.readAsString();
     final decrypted = await E2EE().decrypt(encrypted, myKey, senderKey);
     await ProjectService().createProject(newName);

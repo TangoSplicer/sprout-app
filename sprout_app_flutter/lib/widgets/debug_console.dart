@@ -21,20 +21,19 @@ class DebugConsole extends StatefulWidget {
   State<DebugConsole> createState() => _DebugConsoleState();
 }
 
-class _DebugConsoleState extends State<DebugConsole> with TickerProviderStateMixin {
+class _DebugConsoleState extends State<DebugConsole>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   final ScrollController _logsScrollController = ScrollController();
   final ScrollController _errorsScrollController = ScrollController();
   final TextEditingController _commandController = TextEditingController();
-  final List<String> _commandHistory = [];
-  int _historyIndex = -1;
   bool _autoScroll = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    
+
     // Auto-scroll to bottom when new logs arrive
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
@@ -44,11 +43,11 @@ class _DebugConsoleState extends State<DebugConsole> with TickerProviderStateMix
   @override
   void didUpdateWidget(DebugConsole oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     // Auto-scroll when new content is added
-    if (_autoScroll && (
-        widget.logs.length != oldWidget.logs.length ||
-        widget.errors.length != oldWidget.errors.length)) {
+    if (_autoScroll &&
+        (widget.logs.length != oldWidget.logs.length ||
+            widget.errors.length != oldWidget.errors.length)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom();
       });
@@ -83,37 +82,10 @@ class _DebugConsoleState extends State<DebugConsole> with TickerProviderStateMix
 
   void _executeCommand(String command) {
     if (command.trim().isEmpty) return;
-    
-    _commandHistory.add(command);
-    _historyIndex = -1;
-    _commandController.clear();
-    
-    widget.onCommand?.call(command);
-  }
 
-  void _navigateHistory(bool up) {
-    if (_commandHistory.isEmpty) return;
-    
-    if (up) {
-      if (_historyIndex < _commandHistory.length - 1) {
-        _historyIndex++;
-      }
-    } else {
-      if (_historyIndex > 0) {
-        _historyIndex--;
-      } else {
-        _historyIndex = -1;
-        _commandController.clear();
-        return;
-      }
-    }
-    
-    if (_historyIndex >= 0) {
-      _commandController.text = _commandHistory[_commandHistory.length - 1 - _historyIndex];
-      _commandController.selection = TextSelection.fromPosition(
-        TextPosition(offset: _commandController.text.length),
-      );
-    }
+    _commandController.clear();
+
+    widget.onCommand?.call(command);
   }
 
   @override
@@ -199,7 +171,9 @@ class _DebugConsoleState extends State<DebugConsole> with TickerProviderStateMix
             children: [
               IconButton(
                 icon: Icon(
-                  _autoScroll ? Icons.vertical_align_bottom : Icons.vertical_align_top,
+                  _autoScroll
+                      ? Icons.vertical_align_bottom
+                      : Icons.vertical_align_top,
                   color: Colors.grey.shade400,
                   size: 18,
                 ),
@@ -211,7 +185,8 @@ class _DebugConsoleState extends State<DebugConsole> with TickerProviderStateMix
                     _scrollToBottom();
                   }
                 },
-                tooltip: _autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll',
+                tooltip:
+                    _autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll',
               ),
               IconButton(
                 icon: Icon(
@@ -327,10 +302,10 @@ class _DebugConsoleState extends State<DebugConsole> with TickerProviderStateMix
 
   Widget _buildLogEntry(String message, LogLevel level) {
     final timestamp = DateTime.now().toString().split(' ')[1].substring(0, 8);
-    
+
     Color color;
     IconData icon;
-    
+
     switch (level) {
       case LogLevel.info:
         color = Colors.blue;
@@ -446,16 +421,6 @@ class _DebugConsoleState extends State<DebugConsole> with TickerProviderStateMix
                 contentPadding: EdgeInsets.zero,
               ),
               onSubmitted: _executeCommand,
-              onChanged: (text) {
-                // Reset history navigation when typing
-                if (_historyIndex >= 0) {
-                  _historyIndex = -1;
-                }
-              },
-              onTap: () {
-                // Reset history navigation when tapping
-                _historyIndex = -1;
-              },
               textInputAction: TextInputAction.send,
             ),
           ),
@@ -488,7 +453,6 @@ enum LogLevel { info, warning, error }
 class CommandHelp {
   final String command;
   final String description;
-  
+
   CommandHelp(this.command, this.description);
 }
-

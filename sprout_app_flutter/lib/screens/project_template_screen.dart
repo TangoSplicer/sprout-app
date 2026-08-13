@@ -29,7 +29,8 @@ class ProjectTemplateScreen extends StatefulWidget {
 }
 
 class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
-  final TextEditingController _nameController = TextEditingController(text: 'My App');
+  final TextEditingController _nameController =
+      TextEditingController(text: 'My App');
   final List<ProjectTemplate> _templates = [];
   int _selectedTemplateIndex = 0;
   bool _isCreating = false;
@@ -44,7 +45,7 @@ class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
     // Convert AI templates to project templates
     final aiAssistant = EnhancedAIAssistant();
     final aiTemplates = aiAssistant.getTemplates();
-    
+
     // Define template colors and icons
     final colors = [
       const Color(0xFF4A9D5E), // Green
@@ -53,7 +54,7 @@ class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
       const Color(0xFF009688), // Teal
       const Color(0xFFFF9800), // Orange
     ];
-    
+
     final icons = [
       Icons.check_box_outlined,
       Icons.calculate_outlined,
@@ -61,7 +62,7 @@ class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
       Icons.favorite_outline,
       Icons.calendar_today_outlined,
     ];
-    
+
     // Create project templates from AI templates
     for (var i = 0; i < aiTemplates.length; i++) {
       final template = aiTemplates[i];
@@ -69,14 +70,15 @@ class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
         ProjectTemplate(
           name: template.name,
           description: template.description,
-          code: template.code.replaceAll('{{title}}', _nameController.text)
+          code: template.code
+              .replaceAll('{{title}}', _nameController.text)
               .replaceAll('{{appName}}', _nameController.text),
           icon: icons[i % icons.length],
           color: colors[i % colors.length],
         ),
       );
     }
-    
+
     // Add blank template
     _templates.add(
       ProjectTemplate(
@@ -98,7 +100,7 @@ screen Home {
         color: Colors.grey.shade700,
       ),
     );
-    
+
     setState(() {});
   }
 
@@ -150,7 +152,7 @@ screen Home {
               },
             ),
             const SizedBox(height: 24),
-            
+
             const Text(
               'Choose a template:',
               style: TextStyle(
@@ -159,78 +161,79 @@ screen Home {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // Template grid
             Expanded(
               child: _templates.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.8,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: _templates.length,
-                    itemBuilder: (context, index) {
-                      final template = _templates[index];
-                      final isSelected = _selectedTemplateIndex == index;
-                      
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedTemplateIndex = index;
-                          });
-                        },
-                        child: Card(
-                          elevation: isSelected ? 4 : 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: isSelected
-                              ? BorderSide(color: template.color, width: 2)
-                              : BorderSide.none,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  template.icon,
-                                  size: 48,
-                                  color: template.color,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  template.name,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                  ? const Center(child: CircularProgressIndicator())
+                  : GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.8,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
+                      itemCount: _templates.length,
+                      itemBuilder: (context, index) {
+                        final template = _templates[index];
+                        final isSelected = _selectedTemplateIndex == index;
+
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedTemplateIndex = index;
+                            });
+                          },
+                          child: Card(
+                            elevation: isSelected ? 4 : 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: isSelected
+                                  ? BorderSide(color: template.color, width: 2)
+                                  : BorderSide.none,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    template.icon,
+                                    size: 48,
+                                    color: template.color,
                                   ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  template.description,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade700,
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    template.name,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    template.description,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Create button
             SizedBox(
               width: double.infinity,
@@ -267,14 +270,15 @@ screen Home {
       final appState = Provider.of<AppState>(context, listen: false);
       final projectName = _nameController.text.trim();
       final template = _templates[_selectedTemplateIndex];
-      
+
       // Create the project
       await appState.createProject(projectName);
-      
+
       // Save the template code
-      await appState.saveCode(template.code.replaceAll('{{title}}', projectName)
+      await appState.saveCode(template.code
+          .replaceAll('{{title}}', projectName)
           .replaceAll('{{appName}}', projectName));
-      
+
       if (mounted) {
         // Navigate to the editor
         Navigator.pushReplacement(

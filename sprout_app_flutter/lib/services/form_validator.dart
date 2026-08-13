@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'security_analyzer.dart';
 
 enum ValidationLevel {
@@ -105,8 +106,8 @@ class FormValidator {
     required String value,
     bool required = false,
   }) {
-    final emailPattern = r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$';
-    
+    const emailPattern = r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$';
+
     return validateTextField(
       fieldName: fieldName,
       value: value,
@@ -126,7 +127,7 @@ class FormValidator {
     final urlPattern = allowHttp
         ? r'^https?://[\w\-.]+(:\d+)?(/[\w\-./?%&=]*)?$'
         : r'^https://[\w\-.]+(:\d+)?(/[\w\-./?%&=]*)?$';
-    
+
     final result = validateTextField(
       fieldName: fieldName,
       value: value,
@@ -203,11 +204,9 @@ class FormValidator {
   }
 
   /// Validate form data
-  ValidationResult validateForm(
-    Map<String, dynamic> formData,
-    Map<String, Map<String, dynamic>> validationRules,
-    {ValidationLevel level = ValidationLevel.standard}
-  ) {
+  ValidationResult validateForm(Map<String, dynamic> formData,
+      Map<String, Map<String, dynamic>> validationRules,
+      {ValidationLevel level = ValidationLevel.standard}) {
     final errors = <String>[];
     final warnings = <String>[];
     final sanitizedData = <String, dynamic>{};
@@ -329,7 +328,7 @@ class FormValidator {
     // Check for XSS patterns
     final xssPatterns = [
       r'<script[^>]*>.*?</script>',
-      r'on\w+\s*=\s*["\'][^"\']*["\']',
+      r'''on\w+\s*=\s*["'][^"']*["']''',
       r'javascript:',
     ];
 
@@ -342,7 +341,8 @@ class FormValidator {
 
     // Check for path traversal
     if (RegExp(r'\.\.[/\\]').hasMatch(value)) {
-      issues.add('$fieldName contains potentially dangerous path traversal patterns');
+      issues.add(
+          '$fieldName contains potentially dangerous path traversal patterns');
     }
 
     return issues;
@@ -360,20 +360,17 @@ class FormValidator {
 
       if (report.criticalIssues > 0) {
         errors.add(
-          '${entry.key} contains ${report.criticalIssues} critical security issues'
-        );
+            '${entry.key} contains ${report.criticalIssues} critical security issues');
       }
 
       if (report.highIssues > 0) {
         errors.add(
-          '${entry.key} contains ${report.highIssues} high-severity security issues'
-        );
+            '${entry.key} contains ${report.highIssues} high-severity security issues');
       }
 
       if (report.mediumIssues > 0) {
         warnings.add(
-          '${entry.key} contains ${report.mediumIssues} medium-severity security issues'
-        );
+            '${entry.key} contains ${report.mediumIssues} medium-severity security issues');
       }
     }
 
@@ -446,21 +443,17 @@ class FormValidator {
 
     // Remove script tags
     sanitized = sanitized.replaceAll(
-      RegExp(r'<script[^>]*>.*?</script>', caseSensitive: false, dotAll: true),
-      ''
-    );
+        RegExp(r'<script[^>]*>.*?</script>',
+            caseSensitive: false, dotAll: true),
+        '');
 
     // Remove dangerous event handlers
     sanitized = sanitized.replaceAll(
-      RegExp(r'on\w+\s*=\s*["\'][^"\']*["\']', caseSensitive: false),
-      ''
-    );
+        RegExp(r'''on\w+\s*=\s*["'][^"']*["']''', caseSensitive: false), '');
 
     // Remove javascript: protocol
-    sanitized = sanitized.replaceAll(
-      RegExp(r'javascript:', caseSensitive: false),
-      ''
-    );
+    sanitized =
+        sanitized.replaceAll(RegExp(r'javascript:', caseSensitive: false), '');
 
     return sanitized;
   }

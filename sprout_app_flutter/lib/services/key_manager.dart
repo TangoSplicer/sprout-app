@@ -1,5 +1,6 @@
 // flutter/lib/services/key_manager.dart
 import 'package:local_auth/local_auth.dart';
+import 'package:pointycastle/export.dart';
 import 'e2ee.dart';
 
 class KeyManager {
@@ -12,7 +13,7 @@ class KeyManager {
   AsymmetricKeyPair<ECPublicKey, ECPrivateKey>? _cachedKeys;
 
   Future<bool> canUseBiometrics() async {
-    return await _auth.canCheckBiometrics();
+    return _auth.canCheckBiometrics;
   }
 
   Future<bool> authenticate() async {

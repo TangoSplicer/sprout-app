@@ -77,14 +77,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         final name = projects[index];
                         return Card(
                           child: ListTile(
-                            leading: const Icon(Icons.code, color: Color(0xFF4A9D5E)),
+                            leading: const Icon(Icons.code,
+                                color: Color(0xFF4A9D5E)),
                             title: Text(name),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => EditorScreen(projectName: name),
+                                  builder: (_) =>
+                                      EditorScreen(projectName: name),
                                 ),
                               );
                             },
@@ -134,7 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A9D5E)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4A9D5E)),
             onPressed: () => Navigator.pop(ctx, controller.text),
             child: const Text('Create'),
           ),
@@ -156,19 +159,19 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.light_mode, size: 64, color: Color(0xFFFFC107)),
-          const SizedBox(height: 16),
-          const Text(
+          Icon(Icons.light_mode, size: 64, color: Color(0xFFFFC107)),
+          SizedBox(height: 16),
+          Text(
             'No apps yet',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
-          const Text('Tap "+" to grow your first one.'),
-          const SizedBox(height: 16),
+          SizedBox(height: 8),
+          Text('Tap "+" to grow your first one.'),
+          SizedBox(height: 16),
         ],
       ),
     );

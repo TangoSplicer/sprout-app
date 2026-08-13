@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'debugger.dart';
 
@@ -11,7 +10,7 @@ class ReactiveRuntime extends ChangeNotifier {
   final Map<String, ReactiveValue> _values = {};
   final Map<String, Set<Function>> _watchers = {};
   final SproutDebugger _debugger = SproutDebugger();
-  
+
   bool _isDisposed = false;
   Timer? _batchUpdateTimer;
   final Set<String> _pendingUpdates = {};
@@ -19,30 +18,30 @@ class ReactiveRuntime extends ChangeNotifier {
   // Get a reactive value by key
   T getValue<T>(String key, T defaultValue) {
     if (_isDisposed) return defaultValue;
-    
+
     final reactiveValue = _values[key];
     if (reactiveValue != null && reactiveValue.value is T) {
       return reactiveValue.value as T;
     }
-    
+
     // Create new reactive value if it doesn't exist
     _values[key] = ReactiveValue<T>(defaultValue);
     _debugger.debug('Created reactive value: $key = $defaultValue');
-    
+
     return defaultValue;
   }
 
   // Set a reactive value and trigger watchers
   void setValue<T>(String key, T value) {
     if (_isDisposed) return;
-    
+
     final oldValue = _values[key]?.value;
-    
+
     // Only update if value actually changed
     if (oldValue != value) {
       _values[key] = ReactiveValue<T>(value);
       _debugger.debug('Updated reactive value: $key = $value (was $oldValue)');
-      
+
       // Schedule batch update
       _scheduleBatchUpdate(key);
     }
@@ -51,7 +50,7 @@ class ReactiveRuntime extends ChangeNotifier {
   // Watch for changes to a reactive value
   void watch(String key, Function(dynamic) callback) {
     if (_isDisposed) return;
-    
+
     _watchers.putIfAbsent(key, () => {}).add(callback);
     _debugger.debug('Added watcher for: $key');
   }
@@ -71,24 +70,25 @@ class ReactiveRuntime extends ChangeNotifier {
   // Batch update mechanism to avoid excessive notifications
   void _scheduleBatchUpdate(String key) {
     _pendingUpdates.add(key);
-    
+
     _batchUpdateTimer?.cancel();
-    _batchUpdateTimer = Timer(const Duration(milliseconds: 16), () { // ~60fps
+    _batchUpdateTimer = Timer(const Duration(milliseconds: 16), () {
+      // ~60fps
       _processBatchUpdates();
     });
   }
 
   void _processBatchUpdates() {
     if (_isDisposed || _pendingUpdates.isEmpty) return;
-    
+
     final updates = List<String>.from(_pendingUpdates);
     _pendingUpdates.clear();
-    
+
     for (final key in updates) {
       final watchers = _watchers[key];
       if (watchers != null && watchers.isNotEmpty) {
         final value = _values[key]?.value;
-        
+
         // Notify all watchers
         for (final callback in List.from(watchers)) {
           try {
@@ -97,7 +97,7 @@ class ReactiveRuntime extends ChangeNotifier {
             _debugger.error('Error in watcher for $key: $e', stack: stack);
           }
         }
-        
+
         _debugger.debug('Notified ${watchers.length} watchers for: $key');
       }
     }
@@ -105,9 +105,10 @@ class ReactiveRuntime extends ChangeNotifier {
   }
 
   // Computed values that automatically update when dependencies change
-  void computed<T>(String key, T Function() computation, List<String> dependencies) {
+  void computed<T>(
+      String key, T Function() computation, List<String> dependencies) {
     if (_isDisposed) return;
-    
+
     // Initial computation
     try {
       final value = computation();
@@ -116,7 +117,7 @@ class ReactiveRuntime extends ChangeNotifier {
       _debugger.error('Error computing $key: $e', stack: stack);
       return;
     }
-    
+
     // Watch all dependencies
     for (final dependency in dependencies) {
       watch(dependency, (_) {
@@ -128,16 +129,17 @@ class ReactiveRuntime extends ChangeNotifier {
         }
       });
     }
-    
-    _debugger.debug('Created computed value: $key (depends on ${dependencies.join(', ')})');
+
+    _debugger.debug(
+        'Created computed value: $key (depends on ${dependencies.join(', ')})');
   }
 
   // Execute a transaction where multiple updates are batched
   void transaction(VoidCallback updates) {
     if (_isDisposed) return;
-    
+
     _batchUpdateTimer?.cancel();
-    
+
     try {
       updates();
     } finally {
@@ -149,8 +151,7 @@ class ReactiveRuntime extends ChangeNotifier {
   // Debug methods
   Map<String, dynamic> getState() {
     return Map.fromEntries(
-      _values.entries.map((e) => MapEntry(e.key, e.value.value))
-    );
+        _values.entries.map((e) => MapEntry(e.key, e.value.value)));
   }
 
   List<String> getWatchedKeys() {
@@ -171,23 +172,26 @@ class ReactiveRuntime extends ChangeNotifier {
   }
 
   // Dispose of the runtime
+  @override
   void dispose() {
     if (_isDisposed) return;
-    
+
     _batchUpdateTimer?.cancel();
     _pendingUpdates.clear();
     _values.clear();
     _watchers.clear();
     _isDisposed = true;
-    
+
     _debugger.info('Reactive runtime disposed');
+    super.dispose();
   }
 
   // Performance monitoring
   RuntimeStats getStats() {
     return RuntimeStats(
       valueCount: _values.length,
-      watcherCount: _watchers.values.map((w) => w.length).fold(0, (a, b) => a + b),
+      watcherCount:
+          _watchers.values.map((w) => w.length).fold(0, (a, b) => a + b),
       pendingUpdates: _pendingUpdates.length,
       isDisposed: _isDisposed,
     );
@@ -284,7 +288,7 @@ class ReactiveList<T> {
   }
 
   T operator [](int index) => _items[index];
-  
+
   void operator []=(int index, T value) {
     _items[index] = value;
     _runtime.setValue(_key, _items);

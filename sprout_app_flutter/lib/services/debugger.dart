@@ -1,5 +1,7 @@
 import 'dart:collection';
 
+import 'dart:developer' as developer;
+
 class SproutDebugger {
   static final SproutDebugger _instance = SproutDebugger._internal();
   factory SproutDebugger() => _instance;
@@ -11,7 +13,7 @@ class SproutDebugger {
 
   List<LogEntry> get logs => _logs.toList();
   List<ErrorEntry> get errors => _errors.toList();
-  
+
   bool get hasErrors => _errors.isNotEmpty;
   bool get hasWarnings => _logs.any((log) => log.level == LogLevel.warning);
 
@@ -22,22 +24,24 @@ class SproutDebugger {
       timestamp: DateTime.now(),
       source: source ?? 'sprout',
     );
-    
+
     _logs.addLast(entry);
-    
+
     // Keep only the most recent entries
     while (_logs.length > _maxEntries) {
       _logs.removeFirst();
     }
-    
-    // Also print to console in debug mode
-    if (level == LogLevel.error) {
-      print('ERROR [$source]: $message');
-    } else if (level == LogLevel.warning) {
-      print('WARN [$source]: $message');
-    } else {
-      print('INFO [$source]: $message');
-    }
+
+    developer.log(
+      message,
+      name: source ?? 'sprout',
+      level: switch (level) {
+        LogLevel.error => 1000,
+        LogLevel.warning => 900,
+        LogLevel.info => 800,
+        LogLevel.debug => 700,
+      },
+    );
   }
 
   void error(String message, {StackTrace? stack, String? source}) {
@@ -47,20 +51,24 @@ class SproutDebugger {
       stackTrace: stack,
       source: source ?? 'sprout',
     );
-    
+
     _errors.addLast(entry);
-    
+
     // Keep only the most recent errors
     while (_errors.length > _maxEntries) {
       _errors.removeFirst();
     }
-    
+
     // Also add as a log entry
     log(message, level: LogLevel.error, source: source);
-    
-    // Print stack trace in debug mode
+
     if (stack != null) {
-      print('Stack trace:\n$stack');
+      developer.log(
+        'Captured error stack trace',
+        name: source ?? 'sprout',
+        level: 1000,
+        stackTrace: stack,
+      );
     }
   }
 
@@ -93,13 +101,17 @@ class SproutDebugger {
     final now = DateTime.now();
     final oneMinuteAgo = now.subtract(const Duration(minutes: 1));
     final oneHourAgo = now.subtract(const Duration(hours: 1));
-    
-    final recentLogs = _logs.where((log) => log.timestamp.isAfter(oneMinuteAgo)).length;
-    final recentErrors = _errors.where((error) => error.timestamp.isAfter(oneMinuteAgo)).length;
-    
-    final hourlyLogs = _logs.where((log) => log.timestamp.isAfter(oneHourAgo)).length;
-    final hourlyErrors = _errors.where((error) => error.timestamp.isAfter(oneHourAgo)).length;
-    
+
+    final recentLogs =
+        _logs.where((log) => log.timestamp.isAfter(oneMinuteAgo)).length;
+    final recentErrors =
+        _errors.where((error) => error.timestamp.isAfter(oneMinuteAgo)).length;
+
+    final hourlyLogs =
+        _logs.where((log) => log.timestamp.isAfter(oneHourAgo)).length;
+    final hourlyErrors =
+        _errors.where((error) => error.timestamp.isAfter(oneHourAgo)).length;
+
     return {
       'total_logs': _logs.length,
       'total_errors': _errors.length,
@@ -122,25 +134,26 @@ class SproutDebugger {
   }
 
   List<LogEntry> getRecentLogs({Duration? since}) {
-    final cutoff = since != null 
+    final cutoff = since != null
         ? DateTime.now().subtract(since)
         : DateTime.now().subtract(const Duration(minutes: 5));
-    
+
     return _logs.where((log) => log.timestamp.isAfter(cutoff)).toList();
   }
 
-  void exportLogs() {
+  String exportLogs() {
     final buffer = StringBuffer();
     buffer.writeln('Sprout Debug Log Export');
     buffer.writeln('Generated: ${DateTime.now()}');
     buffer.writeln('Total Entries: ${_logs.length + _errors.length}');
     buffer.writeln('');
-    
+
     // Export errors first
     if (_errors.isNotEmpty) {
       buffer.writeln('=== ERRORS ===');
       for (final error in _errors) {
-        buffer.writeln('${error.timestamp} [${error.source}] ERROR: ${error.message}');
+        buffer.writeln(
+            '${error.timestamp} [${error.source}] ERROR: ${error.message}');
         if (error.stackTrace != null) {
           buffer.writeln('Stack trace:');
           buffer.writeln(error.stackTrace.toString());
@@ -148,18 +161,18 @@ class SproutDebugger {
         buffer.writeln('');
       }
     }
-    
+
     // Export logs
     if (_logs.isNotEmpty) {
       buffer.writeln('=== LOGS ===');
       for (final log in _logs) {
         final levelStr = log.level.toString().split('.').last.toUpperCase();
-        buffer.writeln('${log.timestamp} [${log.source}] $levelStr: ${log.message}');
+        buffer.writeln(
+            '${log.timestamp} [${log.source}] $levelStr: ${log.message}');
       }
     }
-    
-    // In a real app, you would save this to a file or share it
-    print('Log export:\n${buffer.toString()}');
+
+    return buffer.toString();
   }
 
   // Performance monitoring
@@ -172,7 +185,7 @@ class SproutDebugger {
     final startTime = _performanceTimers[operation];
     if (startTime != null) {
       final duration = DateTime.now().difference(startTime);
-      log('Completed: $operation (${duration.inMilliseconds}ms)', 
+      log('Completed: $operation (${duration.inMilliseconds}ms)',
           level: LogLevel.debug, source: 'perf');
       _performanceTimers.remove(operation);
     } else {

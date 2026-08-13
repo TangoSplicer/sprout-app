@@ -10,8 +10,9 @@ class RecoveryScreen extends StatefulWidget {
 }
 
 class _RecoveryScreenState extends State<RecoveryScreen> {
-  final _recoveryPhrase = "sprout garden leaf water code grow plant idea simple trust secure future";
-  List<bool> _confirmed = List.filled(12, false);
+  final _recoveryPhrase =
+      "sprout garden leaf water code grow plant idea simple trust secure future";
+  final List<bool> _confirmed = List.filled(12, false);
   final LocalAuthentication _auth = LocalAuthentication();
   bool _canCheckBiometrics = false;
 
@@ -22,7 +23,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
   }
 
   Future<void> _checkBiometrics() async {
-    final canCheck = await _auth.canCheckBiometrics();
+    final canCheck = await _auth.canCheckBiometrics;
     setState(() {
       _canCheckBiometrics = canCheck;
     });
@@ -73,7 +74,8 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
             if (allConfirmed)
               const Text(
                 '✅ Great! You’ve confirmed your recovery phrase.',
-                style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                style:
+                    TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
               )
             else
               const Text(
@@ -87,10 +89,11 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
                 label: const Text('Enable Biometric Unlock'),
                 onPressed: () async {
                   final didAuthenticate = await _auth.authenticate(
-                    localizedReason: 'Use Face ID or fingerprint to unlock your apps',
+                    localizedReason:
+                        'Use Face ID or fingerprint to unlock your apps',
                   );
+                  if (!context.mounted) return;
                   if (didAuthenticate) {
-                    // Store flag: biometrics enabled
                     Navigator.pop(context);
                   }
                 },

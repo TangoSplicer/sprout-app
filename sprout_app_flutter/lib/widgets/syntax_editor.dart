@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_highlight/themes/github.dart';
 // import 'package:flutter_highlight/themes/monokai_sublime.dart';
@@ -29,7 +28,7 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
   late ScrollController _scrollController;
   late ScrollController _lineNumberScrollController;
   final FocusNode _focusNode = FocusNode();
-  
+
   int _currentLine = 1;
   int _currentColumn = 1;
 
@@ -39,10 +38,10 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
     _controller = TextEditingController(text: widget.text);
     _scrollController = ScrollController();
     _lineNumberScrollController = ScrollController();
-    
+
     _controller.addListener(_onTextChanged);
     _scrollController.addListener(_syncLineNumberScroll);
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateCursorPosition();
     });
@@ -71,11 +70,11 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
   void _updateCursorPosition() {
     final text = _controller.text;
     final selection = _controller.selection;
-    
+
     if (selection.baseOffset >= 0) {
       final beforeCursor = text.substring(0, selection.baseOffset);
       final lines = beforeCursor.split('\n');
-      
+
       setState(() {
         _currentLine = lines.length;
         _currentColumn = lines.last.length + 1;
@@ -96,7 +95,7 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
   @override
   Widget build(BuildContext context) {
     final lineCount = _controller.text.split('\n').length;
-    
+
     return Column(
       children: [
         Expanded(
@@ -141,12 +140,12 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
                   '${index + 1}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: _currentLine == index + 1 
+                    color: _currentLine == index + 1
                         ? Theme.of(context).primaryColor
                         : Colors.grey.shade600,
                     fontFamily: 'JetBrainsMono',
-                    fontWeight: _currentLine == index + 1 
-                        ? FontWeight.bold 
+                    fontWeight: _currentLine == index + 1
+                        ? FontWeight.bold
                         : FontWeight.normal,
                   ),
                 ),
@@ -281,23 +280,24 @@ class SproutHighlighter {
   static List<HighlightSpan> highlight(String code) {
     final spans = <HighlightSpan>[];
     final theme = getSproutTheme();
-    
+
     // Simple regex-based highlighting for SproutScript
     final patterns = {
-      r'\b(app|screen|ui|state|button|label|title|column|row|if|else)\b': 'keyword',
+      r'\b(app|screen|ui|state|button|label|title|column|row|if|else)\b':
+          'keyword',
       r'"[^"]*"': 'string',
       r'\b\d+(\.\d+)?\b': 'number',
       r'//.*': 'comment',
       r'\b[a-zA-Z_][a-zA-Z0-9_]*\s*\(': 'function',
       r'\$\{[^}]*\}': 'variable',
     };
-    
+
     int lastEnd = 0;
-    
+
     for (final entry in patterns.entries) {
       final regex = RegExp(entry.key);
       final matches = regex.allMatches(code);
-      
+
       for (final match in matches) {
         if (match.start >= lastEnd) {
           spans.add(HighlightSpan(
@@ -309,7 +309,7 @@ class SproutHighlighter {
         }
       }
     }
-    
+
     return spans;
   }
 }
@@ -318,11 +318,10 @@ class HighlightSpan {
   final int start;
   final int end;
   final TextStyle style;
-  
+
   HighlightSpan({
     required this.start,
     required this.end,
     required this.style,
   });
 }
-

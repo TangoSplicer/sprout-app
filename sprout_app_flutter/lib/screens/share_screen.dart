@@ -36,11 +36,13 @@ class _ShareScreenState extends State<ShareScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Scan to share your app', style: TextStyle(fontSize: 18)),
+                  const Text('Scan to share your app',
+                      style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 16),
                   QrService.buildQrWidget(_qrData!),
                   const SizedBox(height: 16),
-                  const Text('Anyone can install this app', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                  const Text('Anyone can install this app',
+                      style: TextStyle(fontSize: 14, color: Colors.grey)),
                 ],
               ),
             ),
