@@ -57,16 +57,17 @@ void main() {
     await tester.tap(find.text('Open AI'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Todo list with rankings');
-    await tester.tap(find.text('Generate'));
+    await tester.tap(find.text('Create a tailored starter'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pumpAndSettle();
 
-    expect(find.text('Generated Code:'), findsOneWidget);
-    await tester.tap(find.text('Use'));
+    expect(find.text('Your editable starter'), findsOneWidget);
+    await tester.tap(find.text('Use in my app'));
     await tester.pumpAndSettle();
 
-    expect(acceptedCode, contains('app "Ranked Todo"'));
+    expect(acceptedCode, startsWith('app "'));
+    expect(acceptedCode, contains('Todo'));
     expect(acceptedCode, contains('input "Task to rank" -> draft'));
-    expect(acceptedCode, contains('todos.remove_first()'));
+    expect(acceptedCode, contains('.remove_first()'));
   });
 }

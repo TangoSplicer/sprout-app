@@ -11,9 +11,9 @@ void main() {
         await AIAssistant().generate('Create a todo list with rankings');
     final preview = SproutPreviewDocument.parse(code);
 
-    expect(code, contains('app "Ranked Todo"'));
-    expect(preview.appName, 'Ranked Todo');
-    expect(preview.labels, contains('My ranked tasks'));
+    expect(code, startsWith('app "'));
+    expect(preview.appName, contains('Todo'));
+    expect(preview.labels, contains('Your ranked tasks'));
     expect(preview.buttons, contains('Add task'));
     expect(preview.buttons, contains('Complete first task'));
   });

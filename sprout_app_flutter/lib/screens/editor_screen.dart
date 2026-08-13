@@ -1,13 +1,13 @@
-// flutter/lib/screens/editor_screen.dart
 import 'package:flutter/material.dart';
-import 'preview_screen.dart';
-import 'ai_screen.dart';
-import 'share_screen.dart';
+
+import '../services/debugger.dart';
+import '../services/language_server.dart';
 import '../services/project_service.dart';
 import '../widgets/debug_console.dart';
 import '../widgets/syntax_editor.dart';
-import '../services/language_server.dart';
-import '../services/debugger.dart';
+import 'ai_screen.dart';
+import 'preview_screen.dart';
+import 'share_screen.dart';
 
 class EditorScreen extends StatefulWidget {
   final String projectName;
@@ -20,7 +20,7 @@ class EditorScreen extends StatefulWidget {
 
 class _EditorScreenState extends State<EditorScreen> {
   late Future<String> _codeFuture;
-  late TextEditingController _controller;
+  TextEditingController? _controller;
   bool _showConsole = false;
   final SproutDebugger _debugger = SproutDebugger();
   final LanguageServerClient _ls = LanguageServerClient();
@@ -31,95 +31,132 @@ class _EditorScreenState extends State<EditorScreen> {
     super.initState();
     _codeFuture = ProjectService().readFile(widget.projectName, 'main.sprout');
     _codeFuture.then((content) {
-      if (mounted) {
-        setState(() {
-          _controller = TextEditingController(text: content);
-        });
-        _ls.notifyChange(content); // Sync to language server
-      }
+      if (!mounted) return;
+      setState(() {
+        _controller = TextEditingController(text: content);
+      });
+      _ls.notifyChange(content);
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
-  Future<void> _compile() async {
-    final code = _controller.text;
+  Future<bool> _compile({bool announce = true}) async {
+    final controller = _controller;
+    if (controller == null) return false;
     _debugger.clear();
 
     try {
-      final wasm = await ProjectService().compileCode(code);
-      if (wasm.isNotEmpty) {
-        _debugger.log("Compiled to native app structure");
-      } else {
-        _debugger.error("Compiler returned empty output");
+      final output = await ProjectService().compileCode(controller.text);
+      if (output.isEmpty) {
+        throw StateError('The compiler returned no preview output.');
       }
-    } catch (e, stack) {
-      _debugger.error("Compile error: $e", stack: stack);
+      _debugger.log('App compiled successfully.');
+      if (announce && mounted) {
+        _showMessage('Your app is ready to preview.');
+      }
+      return true;
+    } catch (error, stack) {
+      _debugger.error('Compile error: $error', stack: stack);
+      if (mounted) {
+        setState(() => _showConsole = true);
+        _showMessage('Fix the highlighted compile issue, then try again.',
+            error: true);
+      }
+      return false;
     }
   }
 
-  Future<void> _save() async {
+  Future<bool> _save({bool announce = true}) async {
+    final controller = _controller;
+    if (controller == null) return false;
     try {
       await ProjectService()
-          .writeFile(widget.projectName, 'main.sprout', _controller.text);
-      _debugger.log("Saved to project");
-      await _ls.notifyChange(_controller.text); // Update language server
-    } catch (e, stack) {
-      _debugger.error("Save failed: $e", stack: stack);
+          .writeFile(widget.projectName, 'main.sprout', controller.text);
+      await _ls.notifyChange(controller.text);
+      _debugger.log('Saved to project.');
+      if (announce && mounted) _showMessage('Saved to ${widget.projectName}.');
+      return true;
+    } catch (error, stack) {
+      _debugger.error('Save failed: $error', stack: stack);
+      if (mounted) _showMessage('Could not save this project.', error: true);
+      return false;
     }
+  }
+
+  void _showMessage(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = _controller;
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.projectName}.sprout'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.projectName),
+            Text(
+              'Edit your app',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () {
-              setState(() {
-                _showConsole = !_showConsole;
-              });
-            },
-            color: _debugger.errors.isEmpty ? null : Colors.red,
+            icon: Icon(_showConsole ? Icons.terminal : Icons.terminal_outlined),
+            tooltip: _showConsole ? 'Hide activity log' : 'Show activity log',
+            onPressed: () => setState(() => _showConsole = !_showConsole),
           ),
           IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ShareScreen(projectName: widget.projectName),
-                ),
-              );
-            },
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Share this project',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ShareScreen(projectName: widget.projectName),
+              ),
+            ),
           ),
         ],
       ),
       body: FutureBuilder<String>(
         future: _codeFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (controller == null || !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-
           return Column(
             children: [
-              Flexible(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                child: Text(
+                  'Write or ask for an app. Save it, then preview exactly what people will use.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
+              Expanded(
                 flex: _showConsole ? 3 : 1,
                 child: SyntaxEditor(
-                  text: _controller.text,
+                  text: controller.text,
                   onChanged: (text) async {
-                    _controller.value = TextEditingValue(
+                    controller.value = TextEditingValue(
                       text: text,
                       selection: TextSelection.collapsed(offset: text.length),
                     );
-                    await _ls.notifyChange(text); // Live feedback
+                    await _ls.notifyChange(text);
                   },
                 ),
               ),
@@ -131,9 +168,12 @@ class _EditorScreenState extends State<EditorScreen> {
                       const Divider(height: 1),
                       Expanded(
                         child: DebugConsole(
-                          logs: _debugger.logs.map((e) => e.message).toList(),
-                          errors:
-                              _debugger.errors.map((e) => e.message).toList(),
+                          logs: _debugger.logs
+                              .map((entry) => entry.message)
+                              .toList(),
+                          errors: _debugger.errors
+                              .map((entry) => entry.message)
+                              .toList(),
                           aiFeedback: _aiFeedback,
                         ),
                       ),
@@ -144,65 +184,66 @@ class _EditorScreenState extends State<EditorScreen> {
           );
         },
       ),
-      bottomNavigationBar: BottomAppBar(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.save),
-                tooltip: 'Save',
-                onPressed: _save,
-              ),
-              IconButton(
-                icon: const Icon(Icons.play_arrow),
-                tooltip: 'Run',
-                onPressed: () async {
-                  await _compile();
-                  if (!context.mounted) return;
-                  if (_debugger.errors.isEmpty) {
-                    Navigator.push(
-                      context,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: BottomAppBar(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Save'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    final previewCode = controller?.text;
+                    if (previewCode == null) return;
+                    final saved = await _save(announce: false);
+                    final compiled = saved && await _compile(announce: false);
+                    if (!mounted || !compiled) return;
+                    await navigator.push(
                       MaterialPageRoute(
-                        builder: (_) => PreviewScreen(code: _controller.text),
+                        builder: (_) => PreviewScreen(code: previewCode),
                       ),
                     );
-                  }
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.smart_toy),
-                tooltip: 'AI Assistant',
-                onPressed: () async {
-                  final result = await Navigator.push<String>(
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Preview app'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AIScreen(projectName: widget.projectName),
+                      ),
+                    );
+                    if (result != null) await _applyAiCode(result);
+                  },
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Ask Sprout'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => AIScreen(projectName: widget.projectName),
+                      builder: (_) =>
+                          ShareScreen(projectName: widget.projectName),
                     ),
-                  );
-                  if (result != null) {
-                    await _applyAiCode(result);
-                  }
-                },
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.install_mobile),
-                tooltip: 'Install',
-                onPressed: () async {
-                  await _save();
-                  await _compile();
-                  if (_debugger.errors.isEmpty) {
-                    try {
-                      await InstallService.installApp(widget.projectName);
-                      _debugger.log("Install started");
-                    } catch (e, stack) {
-                      _debugger.error("Install failed: $e", stack: stack);
-                    }
-                  }
-                },
-              ),
-            ],
+                  ),
+                  icon: const Icon(Icons.ios_share),
+                  label: const Text('Share'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -210,31 +251,18 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Future<void> _applyAiCode(String code) async {
-    _controller.value = TextEditingValue(
+    final controller = _controller;
+    if (controller == null) return;
+    controller.value = TextEditingValue(
       text: code,
       selection: TextSelection.collapsed(offset: code.length),
     );
-
-    try {
-      await ProjectService().writeFile(widget.projectName, 'main.sprout', code);
-      await _ls.notifyChange(code);
-      if (!mounted) return;
-      _setAiFeedback('AI app applied and saved');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Your generated app is now active.')),
-      );
-    } catch (error, stack) {
-      _debugger.error('Could not save AI code: $error', stack: stack);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not save the generated app.')),
-      );
+    final saved = await _save(announce: false);
+    if (!mounted) return;
+    if (saved) {
+      setState(() => _aiFeedback = 'Your tailored app was applied and saved.');
+      _showMessage(
+          'Your tailored app is active. Preview it when you are ready.');
     }
-  }
-
-  void _setAiFeedback(String feedback) {
-    setState(() {
-      _aiFeedback = feedback;
-    });
   }
 }
