@@ -20,7 +20,7 @@ void main() {
 
     expect(find.text('Start with a template'), findsOneWidget);
     expect(find.text('Ranked Todo'), findsOneWidget);
-    expect(find.text('Counter'), findsOneWidget);
+    expect(find.text('Daily Reminders'), findsOneWidget);
     expect(find.text('Create and edit'), findsOneWidget);
   });
 

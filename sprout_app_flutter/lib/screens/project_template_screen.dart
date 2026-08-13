@@ -43,32 +43,62 @@ class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
 }
 
 screen Todo {
+  state draft: ""
+  state tasks: []
   ui {
     label "My ranked tasks"
-    label "1. Plan today"
-    label "2. Finish the important task"
-    label "3. Review tomorrow"
-    button "Add task"
-    button "Mark top task complete"
+    label "Add what matters, then complete the top item."
+    input "Task to rank" -> draft
+    list tasks
+    button "Add task" {
+      tasks.append(draft)
+      draft = ""
+    }
+    button "Complete top task" {
+      tasks.remove_first()
+    }
+    button "How this works" -> Help
+  }
+}
+
+screen Help {
+  ui {
+    label "Your newest task appears at the bottom of the list."
+    button "Back to tasks" { go Back }
   }
 }''',
     ),
     ProjectTemplate(
-      name: 'Counter',
-      description: 'A small tally for anything you track.',
-      icon: Icons.exposure_plus_1_outlined,
+      name: 'Daily Reminders',
+      description: 'Schedule a local notification for one important thing.',
+      icon: Icons.notifications_active_outlined,
       color: Color(0xFF4169A8),
       code: '''app "{{appName}}" {
-  start = "Counter"
+  start = "Reminders"
 }
 
-screen Counter {
-  state count: 0
+screen Reminders {
+  state reminderText: ""
+  state reminderTime: "09:00"
+  state scheduled: []
   ui {
-    label "Keep count"
-    label "Start at zero and make it yours."
-    button "Increase"
-    button "Reset"
+    label "Daily reminders"
+    label "Choose a message and a time in 24-hour format."
+    input "What should Sprout remind you about?" -> reminderText
+    input "Time, for example 09:00" -> reminderTime
+    button "Schedule reminder" {
+      scheduled.append("\${reminderText} at \${reminderTime}")
+      reminder reminderText at reminderTime
+    }
+    list scheduled
+    button "Reminder help" -> Help
+  }
+}
+
+screen Help {
+  ui {
+    label "Sprout asks for notification permission only when you schedule."
+    button "Back to reminders" { go Back }
   }
 }''',
     ),
@@ -82,11 +112,28 @@ screen Counter {
 }
 
 screen Notes {
+  state draft: ""
+  state notes: []
   ui {
     label "Quick notes"
     label "Keep the next important thought close."
-    button "Add a note"
-    button "Review notes"
+    input "Write a note" -> draft
+    list notes
+    button "Save note" {
+      notes.append(draft)
+      draft = ""
+    }
+    button "Archive first note" {
+      notes.remove_first()
+    }
+    button "About notes" -> Help
+  }
+}
+
+screen Help {
+  ui {
+    label "Notes stay on this device until you choose to share them."
+    button "Back to notes" { go Back }
   }
 }''',
     ),
@@ -100,11 +147,28 @@ screen Notes {
 }
 
 screen Habit {
+  state draft: ""
+  state habits: []
   ui {
     label "Today’s habit"
     label "One small action is enough."
-    button "Mark complete"
-    button "See my progress"
+    input "Habit to practise" -> draft
+    list habits
+    button "Add habit" {
+      habits.append(draft)
+      draft = ""
+    }
+    button "Complete first habit" {
+      habits.remove_first()
+    }
+    button "Habit encouragement" -> Help
+  }
+}
+
+screen Help {
+  ui {
+    label "Return tomorrow and keep the next small action visible."
+    button "Back to habits" { go Back }
   }
 }''',
     ),
@@ -149,7 +213,7 @@ screen Habit {
                     return GridView.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
-                        childAspectRatio: 0.9,
+                        childAspectRatio: 0.75,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
                       ),
