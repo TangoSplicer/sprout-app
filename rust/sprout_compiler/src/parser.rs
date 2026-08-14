@@ -109,6 +109,12 @@ impl Parser {
         let legacy_label_regex =
             Regex::new(r#"^(?:label|title)\("([^"]*)"\)$"#).expect("static regex");
         let input_regex = Regex::new(r#"^input\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
+        let text_area_regex =
+            Regex::new(r#"^textarea\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
+        let choice_regex = Regex::new(r#"^choice\s+"([^"]+)"\s+\[([^\]]+)\]\s*->\s*(\w+)$"#)
+            .expect("static regex");
+        let progress_regex =
+            Regex::new(r#"^progress\s+"([^"]+)"\s+(\w+)\s*/\s*(\w+)$"#).expect("static regex");
         let list_regex = Regex::new(r"^list\s+(\w+)$").expect("static regex");
         let section_regex =
             Regex::new(r#"^section\s+"([^"]+)"(?:\s+"([^"]*)")?$"#).expect("static regex");
@@ -153,6 +159,67 @@ impl Parser {
                     bind_to: capture
                         .get(2)
                         .expect("binding capture")
+                        .as_str()
+                        .to_string(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = text_area_regex.captures(line) {
+                elements.push(UiElement::TextArea {
+                    placeholder: capture
+                        .get(1)
+                        .expect("text area capture")
+                        .as_str()
+                        .to_string(),
+                    bind_to: capture
+                        .get(2)
+                        .expect("text area binding capture")
+                        .as_str()
+                        .to_string(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = choice_regex.captures(line) {
+                let options = capture
+                    .get(2)
+                    .expect("choice options capture")
+                    .as_str()
+                    .split(',')
+                    .map(|value| value.trim().trim_matches('"').to_string())
+                    .collect();
+                elements.push(UiElement::Choice {
+                    label: capture
+                        .get(1)
+                        .expect("choice label capture")
+                        .as_str()
+                        .to_string(),
+                    options,
+                    bind_to: capture
+                        .get(3)
+                        .expect("choice binding capture")
+                        .as_str()
+                        .to_string(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = progress_regex.captures(line) {
+                elements.push(UiElement::Progress {
+                    label: capture
+                        .get(1)
+                        .expect("progress label capture")
+                        .as_str()
+                        .to_string(),
+                    value: capture
+                        .get(2)
+                        .expect("progress value capture")
+                        .as_str()
+                        .to_string(),
+                    total: capture
+                        .get(3)
+                        .expect("progress total capture")
                         .as_str()
                         .to_string(),
                 });
@@ -596,6 +663,29 @@ screen Today {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn parses_language_first_input_controls() {
+        let source = r#"app "Journal" { start = "Today" }
+
+screen Today {
+  state entry: ""
+  state mood: "Steady"
+  state progress: 1
+  state target: 7
+  ui {
+    textarea "Write a reflection" -> entry
+    choice "How do you feel?" ["Light", "Steady", "Heavy"] -> mood
+    progress "This week" progress / target
+  }
+}"#;
+        let app = parse_sproutscript(source).expect("language-first controls parse");
+        assert!(matches!(app.screens[0].ui[0], UiElement::TextArea { .. }));
+        assert!(
+            matches!(app.screens[0].ui[1], UiElement::Choice { ref options, .. } if options.len() == 3)
+        );
+        assert!(matches!(app.screens[0].ui[2], UiElement::Progress { .. }));
     }
 
     #[test]

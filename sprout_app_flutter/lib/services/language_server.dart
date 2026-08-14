@@ -159,11 +159,12 @@ class LanguageServerClient {
             documentation: 'Creates a new screen in your app',
           ),
           const CompletionItem(
-            label: 'data',
+            label: 'state',
             kind: CompletionItemKind.keyword,
-            detail: 'Data model declaration',
-            insertText: 'data \${1:ModelName} {\n  \${2:field}: String\n}',
-            documentation: 'Creates a data model',
+            detail: 'Screen state value',
+            insertText: 'state \${1:progress}: \${2:0}',
+            documentation:
+                'Creates a local string, number, boolean, or list state value inside a screen.',
           ),
         ]);
         break;
@@ -171,60 +172,61 @@ class LanguageServerClient {
       case CompletionContext.uiBlock:
         completions.addAll([
           const CompletionItem(
-            label: 'label',
+            label: 'section',
             kind: CompletionItemKind.function,
-            detail: 'Text label',
-            insertText: 'label "\${1:Text}"',
-            documentation: 'Displays text on the screen',
-          ),
-          const CompletionItem(
-            label: 'button',
-            kind: CompletionItemKind.function,
-            detail: 'Interactive button',
-            insertText: 'button "\${1:Click me}" {\n  \${2:// action code}\n}',
-            documentation: 'Creates a clickable button',
-          ),
-          const CompletionItem(
-            label: 'column',
-            kind: CompletionItemKind.function,
-            detail: 'Vertical layout',
-            insertText: 'column {\n  \${1:// child elements}\n}',
-            documentation: 'Arranges children vertically',
-          ),
-          const CompletionItem(
-            label: 'row',
-            kind: CompletionItemKind.function,
-            detail: 'Horizontal layout',
-            insertText: 'row {\n  \${1:// child elements}\n}',
-            documentation: 'Arranges children horizontally',
+            detail: 'Visual grouping',
+            insertText:
+                'section "\${1:What matters}" "\${2:Supporting context}"',
+            documentation:
+                'Creates a purposeful title and supporting detail card.',
           ),
           const CompletionItem(
             label: 'input',
             kind: CompletionItemKind.function,
-            detail: 'Text input field',
-            insertText: 'input "\${1:Label}" binding: \${2:variableName}',
-            documentation: 'Creates a text input field',
+            detail: 'Single-line input',
+            insertText: 'input "\${1:Label}" -> \${2:bindingName}',
+            documentation:
+                'Creates an editable single-line field bound to local state.',
           ),
           const CompletionItem(
-            label: 'image',
+            label: 'textarea',
             kind: CompletionItemKind.function,
-            detail: 'Image display',
-            insertText: 'image "\${1:path/to/image.png}"',
-            documentation: 'Displays an image',
+            detail: 'Long-form input',
+            insertText:
+                'textarea "\${1:Write a reflection}" -> \${2:reflection}',
+            documentation: 'Creates a multi-line editable text surface.',
+          ),
+          const CompletionItem(
+            label: 'choice',
+            kind: CompletionItemKind.function,
+            detail: 'Choice chips',
+            insertText:
+                'choice "\${1:Priority}" ["\${2:Important}", "Useful", "Later"] -> \${3:priority}',
+            documentation: 'Creates a bounded source-defined choice control.',
+          ),
+          const CompletionItem(
+            label: 'progress',
+            kind: CompletionItemKind.function,
+            detail: 'Progress bar',
+            insertText:
+                'progress "\${1:This week}" \${2:progress} / \${3:target}',
+            documentation: 'Renders numeric state as a progress indicator.',
+          ),
+          const CompletionItem(
+            label: 'button',
+            kind: CompletionItemKind.function,
+            detail: 'Bounded action button',
+            insertText:
+                'button "\${1:Record progress}" {\n  increment \${2:progress}\n}',
+            documentation:
+                'Creates a button with safe, source-defined actions.',
           ),
           const CompletionItem(
             label: 'list',
             kind: CompletionItemKind.function,
-            detail: 'Scrollable list',
-            insertText: 'list \${1:items} {\n  \${2:// list item template}\n}',
-            documentation: 'Creates a scrollable list',
-          ),
-          const CompletionItem(
-            label: 'if',
-            kind: CompletionItemKind.keyword,
-            detail: 'Conditional rendering',
-            insertText: 'if \${1:condition} {\n  \${2:// content when true}\n}',
-            documentation: 'Conditionally shows content',
+            detail: 'Bound list',
+            insertText: 'list \${1:items}',
+            documentation: 'Renders a local list binding.',
           ),
         ]);
         break;

@@ -194,27 +194,36 @@ class _SyntaxEditorState extends State<SyntaxEditor> {
         color: Colors.grey.shade100,
         border: Border(top: BorderSide(color: Colors.grey.shade300)),
       ),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
-          Icon(Icons.code, size: 16, color: Colors.grey.shade600),
-          const SizedBox(width: 8),
-          Text(
-            'SproutScript',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const Spacer(),
-          _buildStatusItem('Ln $_currentLine, Col $_currentColumn'),
-          const SizedBox(width: 16),
-          _buildStatusItem('UTF-8'),
-          const SizedBox(width: 16),
-          _buildStatusItem(widget.theme.toUpperCase()),
-          const SizedBox(width: 12),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+          return Row(
+            children: [
+              const SizedBox(width: 12),
+              Icon(Icons.code, size: 16, color: Colors.grey.shade600),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'SproutScript',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              _buildStatusItem('Ln $_currentLine, Col $_currentColumn'),
+              if (!compact) ...[
+                const SizedBox(width: 12),
+                _buildStatusItem('UTF-8'),
+                const SizedBox(width: 12),
+                _buildStatusItem(widget.theme.toUpperCase()),
+              ],
+              const SizedBox(width: 12),
+            ],
+          );
+        },
       ),
     );
   }
@@ -268,7 +277,7 @@ class SproutHighlighter {
 
     // Simple regex-based highlighting for SproutScript
     final patterns = {
-      r'\b(app|screen|ui|state|button|label|title|column|row|if|else)\b':
+      r'\b(app|screen|ui|state|button|label|title|input|textarea|choice|progress|list|section|metric|toggle|divider|reminder|increment|clear|go|navigate|if|else)\b':
           'keyword',
       r'"[^"]*"': 'string',
       r'\b\d+(\.\d+)?\b': 'number',

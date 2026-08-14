@@ -46,6 +46,23 @@ pub enum UiElement {
         placeholder: String,
         bind_to: String,
     },
+    /// A multi-line text surface for journals, notes, reflections, and plans.
+    TextArea {
+        placeholder: String,
+        bind_to: String,
+    },
+    /// A bounded single-choice control with source-defined options.
+    Choice {
+        label: String,
+        options: Vec<String>,
+        bind_to: String,
+    },
+    /// A bounded visual progress indicator based on numeric state values.
+    Progress {
+        label: String,
+        value: String,
+        total: String,
+    },
     Image {
         source: String,
     },
@@ -311,12 +328,42 @@ impl UiElement {
             UiElement::TextField {
                 placeholder,
                 bind_to,
+            }
+            | UiElement::TextArea {
+                placeholder,
+                bind_to,
             } => {
                 if placeholder.len() > 200 {
                     return Err("Placeholder too long".to_string());
                 }
                 if bind_to.len() > 50 {
                     return Err("Binding variable name too long".to_string());
+                }
+            }
+            UiElement::Choice {
+                label,
+                options,
+                bind_to,
+            } => {
+                if label.is_empty() || label.len() > 120 || bind_to.len() > 50 {
+                    return Err("Choice declaration is invalid".to_string());
+                }
+                if options.is_empty()
+                    || options.len() > 8
+                    || options
+                        .iter()
+                        .any(|value| value.is_empty() || value.len() > 50)
+                {
+                    return Err("Choice must contain between 1 and 8 short options".to_string());
+                }
+            }
+            UiElement::Progress {
+                label,
+                value,
+                total,
+            } => {
+                if label.is_empty() || label.len() > 120 || value.len() > 50 || total.len() > 50 {
+                    return Err("Progress declaration is invalid".to_string());
                 }
             }
             UiElement::Image { source } => {

@@ -174,6 +174,64 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ),
           ),
         ),
+      SproutPreviewTextArea(:final placeholder, :final binding) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            controller: _controllerFor(binding),
+            minLines: 4,
+            maxLines: 8,
+            onChanged: (value) => document.updateInput(binding, value),
+            decoration: InputDecoration(
+              alignLabelWithHint: true,
+              labelText: placeholder,
+              hintText: placeholder,
+            ),
+          ),
+        ),
+      SproutPreviewChoice(:final label, :final options, :final binding) => Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  document.resolveTemplate(label),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in options)
+                      ChoiceChip(
+                        label: Text(option),
+                        selected:
+                            document.choiceValue(binding, options) == option,
+                        onSelected: (_) => setState(
+                          () => document.updateInput(binding, option),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      SproutPreviewProgress(
+        :final label,
+        :final valueBinding,
+        :final totalBinding
+      ) =>
+        _buildProgress(
+          document.resolveTemplate(label),
+          document.metricValue(valueBinding),
+          document.metricValue(totalBinding),
+          document.progressValue(valueBinding, totalBinding),
+        ),
       SproutPreviewList(:final binding) => _buildList(binding),
       SproutPreviewSection(:final title, :final detail) => _buildSection(
           document.resolveTemplate(title),
@@ -236,6 +294,44 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildProgress(String label, num value, num total, double progress) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+                Text('$value / $total'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 10,
+                color: scheme.primary,
+                backgroundColor: scheme.surfaceContainerHighest,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

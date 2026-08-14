@@ -75,7 +75,19 @@ class SproutPreviewDocument {
 
   bool toggleValue(String binding) => (_state[binding] as bool?) ?? false;
 
+  String choiceValue(String binding, List<String> options) {
+    final value = _state[binding] as String?;
+    if (value != null && options.contains(value)) return value;
+    return options.first;
+  }
+
   num metricValue(String binding) => (_state[binding] as num?) ?? 0;
+
+  double progressValue(String valueBinding, String totalBinding) {
+    final total = metricValue(totalBinding);
+    if (total <= 0) return 0;
+    return (metricValue(valueBinding) / total).clamp(0, 1).toDouble();
+  }
 
   List<String> listValue(String binding) {
     final value = _state[binding];
@@ -201,6 +213,9 @@ class SproutPreviewDocument {
     final label = RegExp(r'^(?:label|title)\s+"([^"]*)"$');
     final legacyLabel = RegExp(r'^(?:label|title)\("([^"]*)"\)$');
     final input = RegExp(r'^input\s+"([^"]+)"\s*->\s*(\w+)$');
+    final textArea = RegExp(r'^textarea\s+"([^"]+)"\s*->\s*(\w+)$');
+    final choice = RegExp(r'^choice\s+"([^"]+)"\s+\[([^\]]+)\]\s*->\s*(\w+)$');
+    final progress = RegExp(r'^progress\s+"([^"]+)"\s+(\w+)\s*/\s*(\w+)$');
     final list = RegExp(r'^list\s+(\w+)$');
     final section = RegExp(r'^section\s+"([^"]+)"(?:\s+"([^"]*)")?$');
     final metric = RegExp(r'^metric\s+"([^"]+)"\s*->\s*(\w+)$');
@@ -233,6 +248,38 @@ class SproutPreviewDocument {
             binding: inputMatch.group(2)!,
           ),
         );
+        continue;
+      }
+      final textAreaMatch = textArea.firstMatch(line);
+      if (textAreaMatch != null) {
+        elements.add(SproutPreviewTextArea(
+          placeholder: textAreaMatch.group(1)!,
+          binding: textAreaMatch.group(2)!,
+        ));
+        continue;
+      }
+      final choiceMatch = choice.firstMatch(line);
+      if (choiceMatch != null) {
+        final options = choiceMatch
+            .group(2)!
+            .split(',')
+            .map((option) => option.trim().replaceAll('"', ''))
+            .where((option) => option.isNotEmpty)
+            .toList(growable: false);
+        elements.add(SproutPreviewChoice(
+          label: choiceMatch.group(1)!,
+          options: options,
+          binding: choiceMatch.group(3)!,
+        ));
+        continue;
+      }
+      final progressMatch = progress.firstMatch(line);
+      if (progressMatch != null) {
+        elements.add(SproutPreviewProgress(
+          label: progressMatch.group(1)!,
+          valueBinding: progressMatch.group(2)!,
+          totalBinding: progressMatch.group(3)!,
+        ));
         continue;
       }
       final listMatch = list.firstMatch(line);
@@ -430,6 +477,38 @@ class SproutPreviewInput extends SproutPreviewElement {
   final String binding;
 
   const SproutPreviewInput({required this.placeholder, required this.binding});
+}
+
+class SproutPreviewTextArea extends SproutPreviewElement {
+  final String placeholder;
+  final String binding;
+
+  const SproutPreviewTextArea(
+      {required this.placeholder, required this.binding});
+}
+
+class SproutPreviewChoice extends SproutPreviewElement {
+  final String label;
+  final List<String> options;
+  final String binding;
+
+  const SproutPreviewChoice({
+    required this.label,
+    required this.options,
+    required this.binding,
+  });
+}
+
+class SproutPreviewProgress extends SproutPreviewElement {
+  final String label;
+  final String valueBinding;
+  final String totalBinding;
+
+  const SproutPreviewProgress({
+    required this.label,
+    required this.valueBinding,
+    required this.totalBinding,
+  });
 }
 
 class SproutPreviewList extends SproutPreviewElement {

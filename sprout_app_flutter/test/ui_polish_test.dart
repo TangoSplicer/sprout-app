@@ -39,16 +39,15 @@ void main() {
     expect(find.byType(Switch), findsNothing);
   });
 
-  testWidgets(
-      'template picker includes the interactive daily reminders starter',
+  testWidgets('template picker includes a language-first goal-tracker pattern',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(360, 640));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(const MaterialApp(home: ProjectTemplateScreen()));
 
-    expect(find.text('Daily Reminders'), findsOneWidget);
-    expect(find.text('Create and edit'), findsOneWidget);
+    expect(find.text('Goal tracker'), findsOneWidget);
+    expect(find.text('Create and edit source'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

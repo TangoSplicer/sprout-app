@@ -162,11 +162,43 @@ impl WasmRuntime {
             UiElement::TextField {
                 placeholder,
                 bind_to,
+            }
+            | UiElement::TextArea {
+                placeholder,
+                bind_to,
             } => {
                 self.track_memory_usage(placeholder.len());
                 // Security: Track binding variable
                 if !self.state.contains_key(bind_to) {
                     self.update_state(bind_to, ValueType::String(String::new()))?;
+                }
+            }
+            UiElement::Choice {
+                label,
+                options,
+                bind_to,
+            } => {
+                self.track_memory_usage(
+                    label.len() + options.iter().map(String::len).sum::<usize>(),
+                );
+                if !self.state.contains_key(bind_to) {
+                    self.update_state(
+                        bind_to,
+                        ValueType::String(options.first().cloned().unwrap_or_default()),
+                    )?;
+                }
+            }
+            UiElement::Progress {
+                label,
+                value,
+                total,
+            } => {
+                self.track_memory_usage(label.len());
+                if !self.state.contains_key(value) {
+                    self.update_state(value, ValueType::Number(0))?;
+                }
+                if !self.state.contains_key(total) {
+                    self.update_state(total, ValueType::Number(1))?;
                 }
             }
             UiElement::Image { source } => {

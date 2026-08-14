@@ -5,7 +5,7 @@ import '../services/language_server.dart';
 import '../services/project_service.dart';
 import '../widgets/debug_console.dart';
 import '../widgets/syntax_editor.dart';
-import 'ai_screen.dart';
+import 'language_tools_screen.dart';
 import 'preview_screen.dart';
 import 'share_screen.dart';
 
@@ -232,17 +232,21 @@ class _EditorScreenState extends State<EditorScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () async {
+                          final currentCode = controller?.text;
+                          if (currentCode == null) return;
                           final result = await Navigator.push<String>(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  AIScreen(projectName: widget.projectName),
+                              builder: (_) => LanguageToolsScreen(
+                                projectName: widget.projectName,
+                                source: currentCode,
+                              ),
                             ),
                           );
-                          if (result != null) await _applyAiCode(result);
+                          if (result != null) await _applyReviewedCode(result);
                         },
-                        icon: const Icon(Icons.auto_awesome),
-                        label: const Text('Ask Sprout'),
+                        icon: const Icon(Icons.rate_review_outlined),
+                        label: const Text('Review source'),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -269,7 +273,7 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  Future<void> _applyAiCode(String code) async {
+  Future<void> _applyReviewedCode(String code) async {
     final controller = _controller;
     if (controller == null) return;
     controller.value = TextEditingValue(
@@ -279,9 +283,10 @@ class _EditorScreenState extends State<EditorScreen> {
     final saved = await _save(announce: false);
     if (!mounted) return;
     if (saved) {
-      setState(() => _aiFeedback = 'Your tailored app was applied and saved.');
+      setState(
+          () => _aiFeedback = 'Your reviewed source was applied and saved.');
       _showMessage(
-          'Your tailored app is active. Preview it when you are ready.');
+          'Your reviewed source is active. Preview it when you are ready.');
     }
   }
 }

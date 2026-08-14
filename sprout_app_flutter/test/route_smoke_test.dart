@@ -18,10 +18,10 @@ void main() {
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: ProjectTemplateScreen()));
 
-    expect(find.text('Start with a template'), findsOneWidget);
-    expect(find.text('Ranked Todo'), findsOneWidget);
-    expect(find.text('Daily Reminders'), findsOneWidget);
-    expect(find.text('Create and edit'), findsOneWidget);
+    expect(find.text('Build from a local pattern'), findsOneWidget);
+    expect(find.text('Goal tracker'), findsOneWidget);
+    expect(find.text('Reflection journal'), findsOneWidget);
+    expect(find.text('Create and edit source'), findsOneWidget);
   });
 
   testWidgets('onboarding begins with the intended welcome message',
