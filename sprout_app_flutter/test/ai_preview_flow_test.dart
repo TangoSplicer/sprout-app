@@ -13,9 +13,16 @@ void main() {
 
     expect(code, startsWith('app "'));
     expect(preview.appName, contains('Todo'));
-    expect(preview.labels, contains('Your ranked tasks'));
-    expect(preview.buttons, contains('Add at the bottom'));
-    expect(preview.buttons, contains('Complete top task'));
+    expect(
+      preview.currentScreen.elements.whereType<SproutPreviewSection>(),
+      isNotEmpty,
+    );
+    expect(
+      preview.currentScreen.elements.whereType<SproutPreviewMetric>(),
+      isNotEmpty,
+    );
+    expect(preview.buttons, contains('Add to today'));
+    expect(preview.buttons, contains('Complete next task'));
   });
 
   testWidgets('syntax editor accepts a replacement document from the parent',

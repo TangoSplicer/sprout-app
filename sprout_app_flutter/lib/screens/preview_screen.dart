@@ -175,6 +175,27 @@ class _PreviewScreenState extends State<PreviewScreen> {
           ),
         ),
       SproutPreviewList(:final binding) => _buildList(binding),
+      SproutPreviewSection(:final title, :final detail) => _buildSection(
+          document.resolveTemplate(title),
+          detail == null ? null : document.resolveTemplate(detail),
+        ),
+      SproutPreviewMetric(:final label, :final binding) => _buildMetric(
+          document.resolveTemplate(label),
+          document.metricValue(binding),
+        ),
+      SproutPreviewToggle(:final label, :final binding) => Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: SwitchListTile.adaptive(
+            value: document.toggleValue(binding),
+            onChanged: (value) =>
+                setState(() => document.updateToggle(binding, value)),
+            title: Text(document.resolveTemplate(label)),
+          ),
+        ),
+      SproutPreviewDivider() => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Divider(),
+        ),
       SproutPreviewButton(:final label) => Padding(
           padding: const EdgeInsets.only(top: 8),
           child: FilledButton(
@@ -183,6 +204,73 @@ class _PreviewScreenState extends State<PreviewScreen> {
           ),
         ),
     };
+  }
+
+  Widget _buildSection(String title, String? detail) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: scheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          if (detail != null && detail.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              detail,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSecondaryContainer,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetric(String label, num value) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          Text(
+            '$value',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildList(String binding) {

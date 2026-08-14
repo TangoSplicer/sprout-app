@@ -185,6 +185,22 @@ impl WasmRuntime {
                     self.update_state(bind_to, ValueType::Array(vec![]))?;
                 }
             }
+            UiElement::Section { title, detail } => {
+                self.track_memory_usage(title.len() + detail.as_ref().map_or(0, String::len));
+            }
+            UiElement::Metric { label, bind_to } => {
+                self.track_memory_usage(label.len());
+                if !self.state.contains_key(bind_to) {
+                    self.update_state(bind_to, ValueType::Number(0))?;
+                }
+            }
+            UiElement::Toggle { label, bind_to } => {
+                self.track_memory_usage(label.len());
+                if !self.state.contains_key(bind_to) {
+                    self.update_state(bind_to, ValueType::Boolean(false))?;
+                }
+            }
+            UiElement::Divider => {}
         }
 
         Ok(())
@@ -245,6 +261,33 @@ impl WasmRuntime {
                 let time = Self::stringify_value(&self.evaluate_expression(time)?);
                 self.log_event(ExecutionEvent::ReminderRequested { message, time });
             }
+            Action::Increment { variable, by } => {
+                let current = match self.state.get(variable) {
+                    Some(ValueType::Number(value)) => *value,
+                    Some(_) => {
+                        return Err(anyhow::anyhow!(
+                            "State variable is not numeric: {}",
+                            variable
+                        ))
+                    }
+                    None => 0,
+                };
+                let updated = current
+                    .checked_add(*by)
+                    .ok_or_else(|| anyhow::anyhow!("Counter value overflow: {}", variable))?;
+                self.update_state(variable, ValueType::Number(updated))?;
+            }
+            Action::ClearList { variable } => match self.state.get(variable) {
+                Some(ValueType::Array(_)) | None => {
+                    self.update_state(variable, ValueType::Array(Vec::new()))?
+                }
+                Some(_) => {
+                    return Err(anyhow::anyhow!(
+                        "State variable is not a list: {}",
+                        variable
+                    ))
+                }
+            },
             Action::RemoveFirstFromList { variable } => {
                 let mut values = match self.state.get(variable) {
                     Some(ValueType::Array(values)) => values.clone(),

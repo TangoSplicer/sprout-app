@@ -250,6 +250,23 @@ impl CodeGenerator {
                     indent = indent * 4
                 ));
             }
+            Action::Increment { variable, by } => {
+                code.push_str(&format!(
+                    "{:indent$};; Adjust {} by {}\n",
+                    "",
+                    variable,
+                    by,
+                    indent = indent * 4
+                ));
+            }
+            Action::ClearList { variable } => {
+                code.push_str(&format!(
+                    "{:indent$};; Clear list {}\n",
+                    "",
+                    variable,
+                    indent = indent * 4
+                ));
+            }
             Action::CallFunction { function, args } => {
                 // Security: Validate function call
                 if function.contains("eval") || function.contains("exec") {

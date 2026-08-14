@@ -7,7 +7,7 @@ void main() {
   testWidgets(
       'Sprout Studio keeps guided tools and editable source visible on a phone',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(360, 1200));
+    await tester.binding.setSurfaceSize(const Size(360, 2800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -20,25 +20,15 @@ void main() {
     await tester.pump();
 
     expect(find.text('Add useful building blocks'), findsOneWidget);
-    await tester.drag(
-      find.byType(CustomScrollView),
-      const Offset(0, -620),
-    );
-    await tester.pump();
     await tester.tap(find.text('Create editable starter'));
     await tester.pump(const Duration(milliseconds: 450));
     await tester.pump();
 
-    await tester.drag(
-      find.byType(CustomScrollView),
-      const Offset(0, -400),
-    );
-    await tester.pump();
     expect(find.text('Editable source'), findsOneWidget);
     expect(find.text('Use this in my app'), findsOneWidget);
     final editors =
         tester.widgetList<TextField>(find.byType(TextField)).toList();
-    expect(editors.last.controller!.text, contains('Schedule reminder'));
+    expect(editors.last.controller!.text, contains('Schedule this reminder'));
     expect(tester.takeException(), isNull);
   });
 

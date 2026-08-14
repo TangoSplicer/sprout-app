@@ -110,6 +110,12 @@ impl Parser {
             Regex::new(r#"^(?:label|title)\("([^"]*)"\)$"#).expect("static regex");
         let input_regex = Regex::new(r#"^input\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
         let list_regex = Regex::new(r"^list\s+(\w+)$").expect("static regex");
+        let section_regex =
+            Regex::new(r#"^section\s+"([^"]+)"(?:\s+"([^"]*)")?$"#).expect("static regex");
+        let metric_regex =
+            Regex::new(r#"^metric\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
+        let toggle_regex =
+            Regex::new(r#"^toggle\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
         let button_regex = Regex::new(r#"^button\s+"([^"]+)"\s*(.*)$"#).expect("static regex");
         let legacy_button_regex = Regex::new(r#"^button\("([^"]+)"\)$"#).expect("static regex");
 
@@ -158,6 +164,53 @@ impl Parser {
                     items: Vec::new(),
                     bind_to: capture.get(1).expect("list capture").as_str().to_string(),
                 });
+                continue;
+            }
+
+            if let Some(capture) = section_regex.captures(line) {
+                elements.push(UiElement::Section {
+                    title: self.process_string_interpolation(
+                        capture.get(1).expect("section title capture").as_str(),
+                    )?,
+                    detail: capture.get(2).map(|value| value.as_str().to_string()),
+                });
+                continue;
+            }
+
+            if let Some(capture) = metric_regex.captures(line) {
+                elements.push(UiElement::Metric {
+                    label: capture
+                        .get(1)
+                        .expect("metric label capture")
+                        .as_str()
+                        .to_string(),
+                    bind_to: capture
+                        .get(2)
+                        .expect("metric binding capture")
+                        .as_str()
+                        .to_string(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = toggle_regex.captures(line) {
+                elements.push(UiElement::Toggle {
+                    label: capture
+                        .get(1)
+                        .expect("toggle label capture")
+                        .as_str()
+                        .to_string(),
+                    bind_to: capture
+                        .get(2)
+                        .expect("toggle binding capture")
+                        .as_str()
+                        .to_string(),
+                });
+                continue;
+            }
+
+            if line == "divider" {
+                elements.push(UiElement::Divider);
                 continue;
             }
 
@@ -226,6 +279,9 @@ impl Parser {
         let remove_regex = Regex::new(r"^(\w+)\.remove\((.+)\)$").expect("static regex");
         let remove_first_regex = Regex::new(r"^(\w+)\.remove_first\(\)$").expect("static regex");
         let reminder_regex = Regex::new(r"^reminder\s+(.+?)\s+at\s+(.+)$").expect("static regex");
+        let increment_regex =
+            Regex::new(r"^increment\s+(\w+)(?:\s+by\s+(-?\d+))?$").expect("static regex");
+        let clear_regex = Regex::new(r"^clear\s+(\w+)$").expect("static regex");
         let assignment_regex = Regex::new(r"^(\w+)\s*=\s*(.+)$").expect("static regex");
         let navigation_regex = Regex::new(r"^(?:go|navigate)\s+(\w+)$").expect("static regex");
 
@@ -284,6 +340,25 @@ impl Parser {
                         .expect("reminder time capture")
                         .as_str()
                         .trim()
+                        .to_string(),
+                });
+            } else if let Some(capture) = increment_regex.captures(statement) {
+                actions.push(Action::Increment {
+                    variable: capture
+                        .get(1)
+                        .expect("counter variable capture")
+                        .as_str()
+                        .to_string(),
+                    by: capture
+                        .get(2)
+                        .map_or(1, |value| value.as_str().parse::<i64>().unwrap_or(1)),
+                });
+            } else if let Some(capture) = clear_regex.captures(statement) {
+                actions.push(Action::ClearList {
+                    variable: capture
+                        .get(1)
+                        .expect("list variable capture")
+                        .as_str()
                         .to_string(),
                 });
             } else if let Some(capture) = navigation_regex.captures(statement) {
@@ -476,6 +551,48 @@ screen Settings {
             app.screens[0].ui[2],
             UiElement::Button {
                 action: Action::Sequence { .. },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn parses_rich_tracker_primitives() {
+        let source = r#"app "Focus" {
+  start = "Today"
+}
+
+screen Today {
+  state sessions: 0
+  state paused: false
+  state notes: []
+  ui {
+    section "Today’s focus" "One intentional session at a time."
+    metric "Sessions completed" -> sessions
+    toggle "Pause prompts" -> paused
+    divider
+    input "Capture a distraction" -> draft
+    list notes
+    button "Start a session" { increment sessions }
+    button "Clear distractions" { clear notes }
+  }
+}"#;
+        let app = parse_sproutscript(source).expect("rich tracker source parses");
+        assert!(matches!(app.screens[0].ui[0], UiElement::Section { .. }));
+        assert!(matches!(app.screens[0].ui[1], UiElement::Metric { .. }));
+        assert!(matches!(app.screens[0].ui[2], UiElement::Toggle { .. }));
+        assert!(matches!(app.screens[0].ui[3], UiElement::Divider));
+        assert!(matches!(
+            app.screens[0].ui[6],
+            UiElement::Button {
+                action: Action::Increment { by: 1, .. },
+                ..
+            }
+        ));
+        assert!(matches!(
+            app.screens[0].ui[7],
+            UiElement::Button {
+                action: Action::ClearList { .. },
                 ..
             }
         ));

@@ -20,7 +20,7 @@ void main() {
     final effects = document.activate(
       document.currentScreen.elements
           .whereType<SproutPreviewButton>()
-          .firstWhere((button) => button.label == 'Schedule reminder'),
+          .firstWhere((button) => button.label == 'Schedule this reminder'),
     );
 
     expect(document.listValue('scheduled'), ['Take evening vitamins at 18:30']);
@@ -45,8 +45,8 @@ void main() {
     expect(events, contains('screen Events'));
     expect(events, contains('Add event and reminder'));
     expect(events, contains('reminder eventName at eventTime'));
-    expect(tasks, contains('screen Tasks'));
-    expect(tasks, contains('Complete top task'));
+    expect(tasks, contains('screen Today'));
+    expect(tasks, contains('Complete next task'));
     expect(tasks, isNot(contains('reminder eventName at eventTime')));
   });
 }

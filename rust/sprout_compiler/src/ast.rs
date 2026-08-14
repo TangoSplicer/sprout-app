@@ -53,6 +53,23 @@ pub enum UiElement {
         items: Vec<String>,
         bind_to: String,
     },
+    /// A concise visual grouping with an optional supporting detail.
+    Section {
+        title: String,
+        detail: Option<String>,
+    },
+    /// A prominent read-only value bound to state, useful for progress and totals.
+    Metric {
+        label: String,
+        bind_to: String,
+    },
+    /// A bounded boolean control that writes only to its declared state binding.
+    Toggle {
+        label: String,
+        bind_to: String,
+    },
+    /// A visual separator for longer task-focused screens.
+    Divider,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +105,15 @@ pub enum Action {
     ScheduleReminder {
         message: String,
         time: String,
+    },
+    /// Adjusts a numeric state value by a bounded signed amount.
+    Increment {
+        variable: String,
+        by: i64,
+    },
+    /// Empties a declared list state variable without accessing external data.
+    ClearList {
+        variable: String,
     },
     CallFunction {
         function: String,
@@ -311,6 +337,20 @@ impl UiElement {
                     return Err("Binding variable name too long".to_string());
                 }
             }
+            UiElement::Section { title, detail } => {
+                if title.is_empty() || title.len() > 120 {
+                    return Err("Section title must be between 1 and 120 characters".to_string());
+                }
+                if detail.as_ref().is_some_and(|value| value.len() > 300) {
+                    return Err("Section detail too long. Maximum is 300 characters".to_string());
+                }
+            }
+            UiElement::Metric { label, bind_to } | UiElement::Toggle { label, bind_to } => {
+                if label.is_empty() || label.len() > 120 || bind_to.len() > 50 {
+                    return Err("Metric or toggle declaration is invalid".to_string());
+                }
+            }
+            UiElement::Divider => {}
         }
 
         Ok(())
@@ -343,9 +383,14 @@ impl Action {
                     return Err("State value too long".to_string());
                 }
             }
-            Action::RemoveFirstFromList { variable } => {
+            Action::RemoveFirstFromList { variable } | Action::ClearList { variable } => {
                 if variable.len() > 50 {
                     return Err("State variable name too long".to_string());
+                }
+            }
+            Action::Increment { variable, by } => {
+                if variable.len() > 50 || !(-1000..=1000).contains(by) {
+                    return Err("Counter action is outside safe bounds".to_string());
                 }
             }
             Action::ScheduleReminder { message, time } => {

@@ -18,14 +18,16 @@ void main() {
 
     expect(groceries, isNot(equals(notes)));
     expect(notes, isNot(equals(habits)));
-    expect(groceries, contains('Shopping list'));
-    expect(notes, contains('Quick notes'));
-    expect(habits, contains('Habit check-in'));
+    expect(groceries, contains('considered shopping list'));
+    expect(notes, contains('home for your ideas'));
+    expect(habits, contains('repeatable routine'));
 
     for (final source in [groceries, notes, habits]) {
       final document = SproutPreviewDocument.parse(source);
       expect(document.hasVisibleContent, isTrue);
-      expect(document.buttons, contains('How this app works'));
+      expect(document.currentScreen.elements.whereType<SproutPreviewSection>(),
+          isNotEmpty);
+      expect(document.buttons, contains('Make this flow yours'));
     }
   });
 }

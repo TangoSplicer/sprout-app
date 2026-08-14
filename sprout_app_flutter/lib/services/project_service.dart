@@ -16,6 +16,20 @@ class ProjectService {
   bool _initialized = false;
   final ValueNotifier<int> projectChanges = ValueNotifier<int>(0);
 
+  @visibleForTesting
+  Future<void> useStorageDirectoryForTesting(Directory root) async {
+    _projectsDir = Directory('${root.path}/sprout_projects');
+    _backupsDir = Directory('${root.path}/sprout_backups');
+    await _projectsDir.create(recursive: true);
+    await _backupsDir.create(recursive: true);
+    _initialized = true;
+  }
+
+  @visibleForTesting
+  void resetStorageDirectoryForTesting() {
+    _initialized = false;
+  }
+
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
 
@@ -37,33 +51,73 @@ class ProjectService {
     try {
       await _ensureInitialized();
 
-      final entities = await _projectsDir.list().toList();
+      final entities = await _projectsDir.list(followLinks: false).toList();
       final projects = <String>[];
-
       for (final entity in entities) {
-        if (entity is Directory) {
-          final name = _sanitizeName(entity.path.split('/').last);
-          if (name.isNotEmpty && await _isValidProject(entity)) {
-            projects.add(name);
-          }
-        }
+        if (entity is! Directory) continue;
+        final displayName = await _recoverProjectIdentity(entity);
+        if (displayName != null) projects.add(displayName);
       }
 
-      projects.sort();
+      projects.sort(
+          (left, right) => left.toLowerCase().compareTo(right.toLowerCase()));
       return projects;
     } catch (e) {
       throw ProjectException('Failed to load projects: $e');
     }
   }
 
-  Future<bool> _isValidProject(Directory dir) async {
+  /// A project with a readable source file is recoverable even if an earlier
+  /// interrupted write left its metadata absent or malformed. This prevents an
+  /// existing project from becoming invisible while still preserving the safe
+  /// directory-derived identifier used by all file operations.
+  Future<String?> _recoverProjectIdentity(Directory projectDir) async {
+    final identifier = _sanitizeName(projectDir.uri.pathSegments
+            .where((segment) => segment.isNotEmpty)
+            .lastOrNull ??
+        '');
+    if (identifier.isEmpty) return null;
+
+    final mainFile = File('${projectDir.path}/main.sprout');
+    if (!await mainFile.exists()) return null;
+
+    final metaFile = File('${projectDir.path}/project.json');
+    Map<String, dynamic>? metadata;
     try {
-      final mainFile = File('${dir.path}/main.sprout');
-      final metaFile = File('${dir.path}/project.json');
-      return await mainFile.exists() && await metaFile.exists();
-    } catch (e) {
-      return false;
+      if (await metaFile.exists()) {
+        final decoded = jsonDecode(await metaFile.readAsString());
+        if (decoded is Map<String, dynamic>) metadata = decoded;
+        if (decoded is Map && metadata == null) {
+          metadata = decoded.map((key, value) => MapEntry('$key', value));
+        }
+      }
+    } catch (_) {
+      metadata = null;
     }
+
+    final storedName = metadata?['name'];
+    final displayName = storedName is String &&
+            storedName.trim().isNotEmpty &&
+            _sanitizeName(storedName) == identifier
+        ? storedName.trim()
+        : identifier;
+
+    if (metadata == null || metadata['sanitized_name'] != identifier) {
+      final source = await mainFile.readAsString();
+      await _writeJsonAtomically(metaFile, {
+        ...?metadata,
+        'name': displayName,
+        'sanitized_name': identifier,
+        'created': metadata?['created'] ?? DateTime.now().toIso8601String(),
+        'last_recovered': DateTime.now().toIso8601String(),
+        'version': metadata?['version'] ?? '1.0.0',
+        'sprout_version': metadata?['sprout_version'] ?? '0.1.0',
+        'security_level': metadata?['security_level'] ?? 'strict',
+        'checksum': _calculateFileChecksum(source),
+      });
+    }
+
+    return displayName;
   }
 
   Future<void> createProject(String name) async {
@@ -98,7 +152,7 @@ class ProjectService {
         'security_level': 'strict',
         'checksum': _calculateFileChecksum(await mainFile.readAsString()),
       };
-      await metaFile.writeAsString(jsonEncode(metadata));
+      await _writeJsonAtomically(metaFile, metadata);
 
       // Create .gitignore for security
       final gitignoreFile = File('${projectDir.path}/.gitignore');
@@ -419,11 +473,20 @@ class ProjectService {
         final content = await metaFile.readAsString();
         final json = jsonDecode(content) as Map<String, dynamic>;
         json.addAll(updates);
-        await metaFile.writeAsString(jsonEncode(json));
+        await _writeJsonAtomically(metaFile, json);
       }
     } catch (e) {
       // Ignore metadata update failures
     }
+  }
+
+  Future<void> _writeJsonAtomically(
+    File destination,
+    Map<String, dynamic> data,
+  ) async {
+    final temporary = File('${destination.path}.tmp');
+    await temporary.writeAsString(jsonEncode(data), flush: true);
+    await temporary.rename(destination.path);
   }
 
   Future<void> _copyDirectory(Directory source, Directory destination) async {

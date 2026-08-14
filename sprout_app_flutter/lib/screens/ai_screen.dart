@@ -51,11 +51,39 @@ class _AIScreenState extends State<AIScreen> {
       'A daily habit check-in for a healthier routine',
       Icons.favorite_outline,
     ),
+    _CreationPreset(
+      'Focus sessions',
+      'A focus session tracker for deep work and study',
+      Icons.timer_outlined,
+    ),
+    _CreationPreset(
+      'Wellness check-in',
+      'A wellness and mood check-in for a calmer routine',
+      Icons.spa_outlined,
+    ),
+    _CreationPreset(
+      'Personal budget',
+      'A personal budget and spending decision tracker',
+      Icons.account_balance_wallet_outlined,
+    ),
+    _CreationPreset(
+      'Meal planner',
+      'A meal planner for simple weekday dinners',
+      Icons.restaurant_menu_outlined,
+    ),
+    _CreationPreset(
+      'Reading list',
+      'A reading list and book completion tracker',
+      Icons.menu_book_outlined,
+    ),
   ];
 
   static const _options = <_CreationOption>[
     _CreationOption('Interactive input', 'a form input that users can edit'),
-    _CreationOption('Ranked list', 'a ranked list with complete actions'),
+    _CreationOption(
+        'Progress metric', 'a visible completion or progress metric'),
+    _CreationOption(
+        'Personal preference', 'a toggle for a meaningful user preference'),
     _CreationOption('Local reminder', 'a local reminder with a time field'),
     _CreationOption('Extra screen', 'a second help or settings screen'),
   ];

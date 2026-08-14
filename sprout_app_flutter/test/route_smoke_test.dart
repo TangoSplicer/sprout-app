@@ -34,6 +34,8 @@ void main() {
 
   testWidgets('AI Use returns the generated ranked Todo app to its caller',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     String? acceptedCode;
     await tester.pumpWidget(
       MaterialApp(
@@ -57,27 +59,18 @@ void main() {
     await tester.tap(find.text('Open AI'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Todo list with rankings');
-    await tester.drag(
-      find.byType(CustomScrollView),
-      const Offset(0, -560),
-    );
-    await tester.pump();
     await tester.tap(find.text('Create editable starter'));
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump();
 
-    await tester.drag(
-      find.byType(CustomScrollView),
-      const Offset(0, -560),
-    );
-    await tester.pump();
     expect(find.text('Editable source'), findsOneWidget);
     await tester.tap(find.text('Use this in my app'));
     await tester.pumpAndSettle();
 
     expect(acceptedCode, startsWith('app "'));
     expect(acceptedCode, contains('Todo'));
-    expect(acceptedCode, contains('input "Task to rank" -> taskDraft'));
+    expect(
+        acceptedCode, contains('input "Add a meaningful task" -> taskDraft'));
     expect(acceptedCode, contains('.remove_first()'));
   });
 }

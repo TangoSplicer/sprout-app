@@ -60,6 +60,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh projects',
+            onPressed: _refreshProjects,
+          ),
+          IconButton(
             icon: const Icon(Icons.school_outlined),
             tooltip: 'Learn how Sprout works',
             onPressed: () => Navigator.push(

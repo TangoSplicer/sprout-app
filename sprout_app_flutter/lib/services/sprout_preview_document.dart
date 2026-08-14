@@ -73,6 +73,10 @@ class SproutPreviewDocument {
 
   String inputValue(String binding) => (_state[binding] as String?) ?? '';
 
+  bool toggleValue(String binding) => (_state[binding] as bool?) ?? false;
+
+  num metricValue(String binding) => (_state[binding] as num?) ?? 0;
+
   List<String> listValue(String binding) {
     final value = _state[binding];
     if (value is List<String>) return List.unmodifiable(value);
@@ -81,6 +85,10 @@ class SproutPreviewDocument {
 
   void updateInput(String binding, String value) {
     _state[binding] = value.length > 1000 ? value.substring(0, 1000) : value;
+  }
+
+  void updateToggle(String binding, bool value) {
+    _state[binding] = value;
   }
 
   List<SproutPreviewEffect> activate(SproutPreviewButton button) {
@@ -126,6 +134,12 @@ class SproutPreviewDocument {
         final values = List<String>.from(listValue(variable));
         if (values.isNotEmpty) values.removeAt(0);
         _state[variable] = values;
+        return null;
+      case SproutPreviewIncrement(:final variable, :final by):
+        _state[variable] = metricValue(variable) + by;
+        return null;
+      case SproutPreviewClear(:final variable):
+        _state[variable] = <String>[];
         return null;
       case SproutPreviewScheduleReminder(:final message, :final time):
         return SproutPreviewReminderRequest(
@@ -188,6 +202,9 @@ class SproutPreviewDocument {
     final legacyLabel = RegExp(r'^(?:label|title)\("([^"]*)"\)$');
     final input = RegExp(r'^input\s+"([^"]+)"\s*->\s*(\w+)$');
     final list = RegExp(r'^list\s+(\w+)$');
+    final section = RegExp(r'^section\s+"([^"]+)"(?:\s+"([^"]*)")?$');
+    final metric = RegExp(r'^metric\s+"([^"]+)"\s*->\s*(\w+)$');
+    final toggle = RegExp(r'^toggle\s+"([^"]+)"\s*->\s*(\w+)$');
     final button = RegExp(r'^button\s+"([^"]+)"\s*(.*)$');
     final legacyButton = RegExp(r'^button\("([^"]+)"\)$');
 
@@ -221,6 +238,30 @@ class SproutPreviewDocument {
       final listMatch = list.firstMatch(line);
       if (listMatch != null) {
         elements.add(SproutPreviewList(listMatch.group(1)!));
+        continue;
+      }
+      final sectionMatch = section.firstMatch(line);
+      if (sectionMatch != null) {
+        elements.add(SproutPreviewSection(
+          title: sectionMatch.group(1)!,
+          detail: sectionMatch.group(2),
+        ));
+        continue;
+      }
+      final metricMatch = metric.firstMatch(line);
+      if (metricMatch != null) {
+        elements.add(
+            SproutPreviewMetric(metricMatch.group(1)!, metricMatch.group(2)!));
+        continue;
+      }
+      final toggleMatch = toggle.firstMatch(line);
+      if (toggleMatch != null) {
+        elements.add(
+            SproutPreviewToggle(toggleMatch.group(1)!, toggleMatch.group(2)!));
+        continue;
+      }
+      if (line == 'divider') {
+        elements.add(const SproutPreviewDivider());
         continue;
       }
       final oldButton = legacyButton.firstMatch(line);
@@ -266,6 +307,8 @@ class SproutPreviewDocument {
     final remove = RegExp(r'^(\w+)\.remove\((.+)\)$');
     final removeFirst = RegExp(r'^(\w+)\.remove_first\(\)$');
     final reminder = RegExp(r'^reminder\s+(.+?)\s+at\s+(.+)$');
+    final increment = RegExp(r'^increment\s+(\w+)(?:\s+by\s+(-?\d+))?$');
+    final clear = RegExp(r'^clear\s+(\w+)$');
     final assignment = RegExp(r'^(\w+)\s*=\s*(.+)$');
     final navigate = RegExp(r'^(?:go|navigate)\s+(\w+)$');
 
@@ -276,6 +319,8 @@ class SproutPreviewDocument {
       final removeMatch = remove.firstMatch(value);
       final removeFirstMatch = removeFirst.firstMatch(value);
       final reminderMatch = reminder.firstMatch(value);
+      final incrementMatch = increment.firstMatch(value);
+      final clearMatch = clear.firstMatch(value);
       final assignmentMatch = assignment.firstMatch(value);
       final navigateMatch = navigate.firstMatch(value);
       if (appendMatch != null) {
@@ -291,6 +336,13 @@ class SproutPreviewDocument {
           reminderMatch.group(1)!.trim(),
           reminderMatch.group(2)!.trim(),
         ));
+      } else if (incrementMatch != null) {
+        actions.add(SproutPreviewIncrement(
+          incrementMatch.group(1)!,
+          int.tryParse(incrementMatch.group(2) ?? '') ?? 1,
+        ));
+      } else if (clearMatch != null) {
+        actions.add(SproutPreviewClear(clearMatch.group(1)!));
       } else if (navigateMatch != null) {
         actions.add(SproutPreviewNavigate(navigateMatch.group(1)!));
       } else if (assignmentMatch != null) {
@@ -386,6 +438,31 @@ class SproutPreviewList extends SproutPreviewElement {
   const SproutPreviewList(this.binding);
 }
 
+class SproutPreviewSection extends SproutPreviewElement {
+  final String title;
+  final String? detail;
+
+  const SproutPreviewSection({required this.title, this.detail});
+}
+
+class SproutPreviewMetric extends SproutPreviewElement {
+  final String label;
+  final String binding;
+
+  const SproutPreviewMetric(this.label, this.binding);
+}
+
+class SproutPreviewToggle extends SproutPreviewElement {
+  final String label;
+  final String binding;
+
+  const SproutPreviewToggle(this.label, this.binding);
+}
+
+class SproutPreviewDivider extends SproutPreviewElement {
+  const SproutPreviewDivider();
+}
+
 class SproutPreviewButton extends SproutPreviewElement {
   final String label;
   final List<SproutPreviewAction> actions;
@@ -435,6 +512,19 @@ class SproutPreviewScheduleReminder extends SproutPreviewAction {
   final String time;
 
   const SproutPreviewScheduleReminder(this.message, this.time);
+}
+
+class SproutPreviewIncrement extends SproutPreviewAction {
+  final String variable;
+  final int by;
+
+  const SproutPreviewIncrement(this.variable, this.by);
+}
+
+class SproutPreviewClear extends SproutPreviewAction {
+  final String variable;
+
+  const SproutPreviewClear(this.variable);
 }
 
 sealed class SproutPreviewEffect {
