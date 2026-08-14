@@ -211,7 +211,25 @@ class LanguageServerClient {
             insertText:
                 'records \${1:transactions} [\${2:kind}, label, amount]',
             documentation:
-                'Renders named fields from a local collection of records.',
+                'Renders named fields from a local collection of records. Use the editable records completion for search, filter, edit, and delete controls.',
+          ),
+          const CompletionItem(
+            label: 'editable records',
+            kind: CompletionItemKind.function,
+            detail: 'Searchable record manager',
+            insertText:
+                'records \${1:transactions} [\${2:kind}, label, amount] search \${3:recordSearch} filter \${4:recordFilter} editable',
+            documentation:
+                'Renders local records with a search field plus direct edit and delete controls. Use a choice bound to the filter state for categories.',
+          ),
+          const CompletionItem(
+            label: 'breakdown',
+            kind: CompletionItemKind.function,
+            detail: 'Category subtotals',
+            insertText:
+                'breakdown "\${1:Spending by category}" \${2:transactions} \${3:amount} ["\${4:Essential}", "Flexible", "Subscription"]',
+            documentation:
+                'Calculates and displays local subtotals for explicitly named record categories.',
           ),
           const CompletionItem(
             label: 'aggregate',

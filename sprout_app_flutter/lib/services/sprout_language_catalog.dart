@@ -215,9 +215,14 @@ screen Compare {
 }
 
 screen Entries {
+  state entrySearch: ""
+  state entryFilter: "All"
   ui {
-    section "Every money movement" "Income, subscriptions, debt payments, and savings live together in this private list."
-    records transactions [kind, label, amount]
+    section "Every money movement" "Search, filter, correct, or remove entries whenever your plan changes."
+    choice "Show category" ["All", "Income", "Outgoings", "Debt", "Savings"] -> entryFilter
+    records transactions [kind, label, amount] search entrySearch filter entryFilter editable
+    breakdown "January commitments" transactions amount ["Outgoings · January", "Debt · January", "Savings · January"]
+    breakdown "February commitments" transactions amount ["Outgoings · February", "Debt · February", "Savings · February"]
     button "Clear all entries" { clear transactions }
     button "Back to dashboard" { go Back }
   }
@@ -272,6 +277,223 @@ screen Guide {
   }
 }''',
     ),
+    SproutLanguagePattern(
+      name: 'Expense tracker',
+      description:
+          'Log everyday spending with editable categories, a live search, filters, and a local category breakdown.',
+      icon: Icons.receipt_long_outlined,
+      color: Color(0xFF9B5A2E),
+      source: '''app "{{appName}}" {
+  start = "Overview"
+}
+
+screen Overview {
+  state expenses: []
+  ui {
+    section "Spend with clarity" "Every entry stays editable, searchable, and on this device."
+    aggregate "This period" expenses amount ["Essential", "Flexible", "Subscription"] - ["Income"]
+    breakdown "Where your money went" expenses amount ["Essential", "Flexible", "Subscription"]
+    button "Add an expense" -> AddExpense
+    button "Review expenses" -> Expenses
+    button "How this works" -> Guide
+  }
+}
+
+screen AddExpense {
+  state kind: "Essential"
+  state label: ""
+  state amount: 0
+  ui {
+    section "Add an expense" "Use a specific label, such as Mobile plan or Groceries."
+    choice "Category" ["Essential", "Flexible", "Subscription"] -> kind
+    input "What was it for?" -> label
+    number "Amount" -> amount
+    button "Save expense" {
+      expenses.add(kind: kind, label: label, amount: amount)
+      label = ""
+      amount = 0
+      go Expenses
+    }
+    button "Cancel" { go Back }
+  }
+}
+
+screen Expenses {
+  state expenseSearch: ""
+  state expenseFilter: "All"
+  ui {
+    section "Your expense history" "Find an entry, filter a category, or amend an earlier record."
+    choice "Show category" ["All", "Essential", "Flexible", "Subscription"] -> expenseFilter
+    records expenses [kind, label, amount] search expenseSearch filter expenseFilter editable
+    button "Add another expense" -> AddExpense
+    button "Back to overview" { go Back }
+  }
+}
+
+screen Guide {
+  ui {
+    section "Use the details" "Tap the pencil beside an entry to correct it, or remove it with the bin."
+    button "Back to overview" { go Back }
+  }
+}''',
+    ),
+    SproutLanguagePattern(
+      name: 'Inventory tracker',
+      description:
+          'Maintain local stock records with quantity totals, category breakdowns, and searchable correction tools.',
+      icon: Icons.inventory_2_outlined,
+      color: Color(0xFF4169A8),
+      source: '''app "{{appName}}" {
+  start = "Stock"
+}
+
+screen Stock {
+  state items: []
+  ui {
+    section "Know what you have" "A practical stock list for supplies, equipment, or household essentials."
+    aggregate "Tracked units" items quantity ["Supplies", "Equipment", "Consumables"] - ["Removed"]
+    breakdown "Units by category" items quantity ["Supplies", "Equipment", "Consumables"]
+    button "Add stock" -> AddItem
+    button "Browse stock" -> ItemList
+  }
+}
+
+screen AddItem {
+  state category: "Supplies"
+  state name: ""
+  state quantity: 1
+  ui {
+    section "Add an item" "Record a name and the number currently available."
+    choice "Category" ["Supplies", "Equipment", "Consumables"] -> category
+    input "Item name" -> name
+    number "Quantity" -> quantity
+    button "Save stock" {
+      items.add(kind: category, name: name, quantity: quantity)
+      name = ""
+      quantity = 1
+      go ItemList
+    }
+    button "Back to stock" { go Back }
+  }
+}
+
+screen ItemList {
+  state itemSearch: ""
+  state categoryFilter: "All"
+  ui {
+    section "Your stock records" "Search by name, filter a category, or update a count in place."
+    choice "Show category" ["All", "Supplies", "Equipment", "Consumables"] -> categoryFilter
+    records items [kind, name, quantity] search itemSearch filter categoryFilter editable
+    button "Add another item" -> AddItem
+    button "Back to stock" { go Back }
+  }
+}''',
+    ),
+    SproutLanguagePattern(
+      name: 'Health log',
+      description:
+          'Keep an editable private log of readings, wellbeing notes, and repeatable health observations.',
+      icon: Icons.monitor_heart_outlined,
+      color: Color(0xFFB04772),
+      source: '''app "{{appName}}" {
+  start = "Today"
+}
+
+screen Today {
+  state observations: []
+  ui {
+    section "Notice your patterns" "A neutral personal log for observations you choose to keep."
+    breakdown "Logged observations" observations value ["Sleep", "Mood", "Energy"]
+    button "Log an observation" -> AddObservation
+    button "Review history" -> History
+  }
+}
+
+screen AddObservation {
+  state kind: "Sleep"
+  state date: ""
+  state value: 0
+  state notes: ""
+  ui {
+    section "Add a check-in" "Enter a date, a simple value, and any context that is useful to you."
+    choice "What are you tracking?" ["Sleep", "Mood", "Energy"] -> kind
+    input "Date or period" -> date
+    number "Value" -> value
+    textarea "Notes (optional)" -> notes
+    button "Save check-in" {
+      observations.add(kind: kind, date: date, value: value, notes: notes)
+      notes = ""
+      go History
+    }
+    button "Back to today" { go Back }
+  }
+}
+
+screen History {
+  state healthSearch: ""
+  state healthFilter: "All"
+  ui {
+    section "Your private history" "Search, filter, edit, or delete a previous observation."
+    choice "Show type" ["All", "Sleep", "Mood", "Energy"] -> healthFilter
+    records observations [kind, date, value, notes] search healthSearch filter healthFilter editable
+    button "Add another check-in" -> AddObservation
+    button "Back to today" { go Back }
+  }
+}''',
+    ),
+    SproutLanguagePattern(
+      name: 'Contact organiser',
+      description:
+          'Create a focused local relationship list with searchable details, segments, and editable notes.',
+      icon: Icons.people_alt_outlined,
+      color: Color(0xFF5A6F2D),
+      source: '''app "{{appName}}" {
+  start = "Contacts"
+}
+
+screen Contacts {
+  state people: []
+  ui {
+    section "Keep the right details close" "A lightweight, private list for people and useful follow-up context."
+    button "Add a contact" -> AddContact
+    button "Browse contacts" -> Directory
+  }
+}
+
+screen AddContact {
+  state segment: "Personal"
+  state name: ""
+  state phone: ""
+  state notes: ""
+  ui {
+    section "Add a contact" "Capture only the details that will help you next time."
+    choice "Relationship" ["Personal", "Work", "Service"] -> segment
+    input "Name" -> name
+    input "Phone or email" -> phone
+    textarea "Helpful notes" -> notes
+    button "Save contact" {
+      people.add(kind: segment, name: name, phone: phone, notes: notes)
+      name = ""
+      phone = ""
+      notes = ""
+      go Directory
+    }
+    button "Back to contacts" { go Back }
+  }
+}
+
+screen Directory {
+  state contactSearch: ""
+  state segmentFilter: "All"
+  ui {
+    section "Your contact directory" "Search details, focus on a segment, or edit a contact without rebuilding the list."
+    choice "Show relationship" ["All", "Personal", "Work", "Service"] -> segmentFilter
+    records people [kind, name, phone, notes] search contactSearch filter segmentFilter editable
+    button "Add another contact" -> AddContact
+    button "Back to contacts" { go Back }
+  }
+}''',
+    ),
   ];
 
   static const snippets = <SproutLanguageSnippet>[
@@ -307,6 +529,20 @@ screen Guide {
       title: 'Record list',
       description: 'Render structured local entries with selected fields.',
       source: 'records transactions [kind, label, amount]',
+    ),
+    SproutLanguageSnippet(
+      title: 'Searchable record manager',
+      description:
+          'Render records with a local search field, a choice filter, and in-place edit and delete controls.',
+      source:
+          'records transactions [kind, label, amount] search transactionSearch filter transactionFilter editable',
+    ),
+    SproutLanguageSnippet(
+      title: 'Category breakdown',
+      description:
+          'Show a calculated subtotal for each selected record category.',
+      source:
+          'breakdown "Spending by category" transactions amount ["Essential", "Flexible", "Subscription"]',
     ),
     SproutLanguageSnippet(
       title: 'Balance total',

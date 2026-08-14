@@ -274,8 +274,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
           document.metricValue(totalBinding),
           document.progressValue(valueBinding, totalBinding),
         ),
-      SproutPreviewRecordList(:final binding, :final fields) =>
-        _buildRecordList(binding, fields),
+      SproutPreviewRecordList(
+        :final binding,
+        :final fields,
+        :final searchBinding,
+        :final filterBinding,
+        :final editable,
+      ) =>
+        _buildRecordList(
+          binding,
+          fields,
+          searchBinding: searchBinding,
+          filterBinding: filterBinding,
+          editable: editable,
+        ),
+      SproutPreviewBreakdown(
+        :final label,
+        :final collection,
+        :final amountField,
+        :final kinds,
+      ) =>
+        _buildBreakdown(
+          document.resolveTemplate(label),
+          document.breakdownValues(collection, amountField, kinds),
+        ),
       SproutPreviewAggregate(
         :final label,
         :final collection,
@@ -399,61 +421,217 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _buildRecordList(String binding, List<String> fields) {
-    final records = _document!.recordListValue(binding);
-    if (records.isEmpty) {
-      return _buildEmptyState(
-          'No entries yet', 'Use the form above to add your first entry.');
-    }
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: records.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final record = records[index];
-          final title = record[fields.first]?.toString() ?? 'Entry';
-          final detail = fields
-              .skip(1)
-              .map((field) {
-                final value = record[field];
-                if (field == 'amount' && value is num) {
-                  return '£${value.toStringAsFixed(2)}';
-                }
-                return value?.toString() ?? '';
-              })
-              .where((value) => value.isNotEmpty)
-              .join(' · ');
-          return ListTile(
-            leading: CircleAvatar(
-              child: Text('${index + 1}'),
-            ),
-            title: Text(title),
-            subtitle: detail.isEmpty ? null : Text(detail),
-          );
-        },
-      ),
+  Widget _buildRecordList(
+    String binding,
+    List<String> fields, {
+    String? searchBinding,
+    String? filterBinding,
+    required bool editable,
+  }) {
+    final document = _document!;
+    final entries = document.filteredRecordEntries(
+      binding,
+      fields,
+      searchBinding: searchBinding,
+      filterBinding: filterBinding,
     );
-  }
-
-  Widget _buildEmptyState(String title, String detail) {
+    final total = document.recordListValue(binding).length;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.only(top: 12),
         child: Column(
           children: [
-            const Icon(Icons.inbox_outlined),
-            const SizedBox(height: 8),
-            Text(title, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Text(detail, textAlign: TextAlign.center),
+            if (searchBinding != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: TextField(
+                  controller: _controllerFor(searchBinding),
+                  onChanged: (value) {
+                    setState(() => document.updateInput(searchBinding, value));
+                    _persistState();
+                  },
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    prefixIcon: Icon(Icons.search_rounded),
+                    labelText: 'Search entries',
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Showing ${entries.length} of $total entries',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+            ),
+            if (entries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Text(
+                  total == 0
+                      ? 'No entries yet. Use the form above to add your first one.'
+                      : 'No entries match the current search or filter.',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: entries.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+                  final record = entry.record;
+                  final title = record[fields.first]?.toString() ?? 'Entry';
+                  final detail = fields
+                      .skip(1)
+                      .map((field) {
+                        final value = record[field];
+                        if (field == 'amount' && value is num) {
+                          return '£${value.toStringAsFixed(2)}';
+                        }
+                        return value?.toString() ?? '';
+                      })
+                      .where((value) => value.isNotEmpty)
+                      .join(' · ');
+                  return ListTile(
+                    leading: CircleAvatar(child: Text('${entry.index + 1}')),
+                    title: Text(title),
+                    subtitle: detail.isEmpty ? null : Text(detail),
+                    trailing: editable
+                        ? Wrap(
+                            spacing: 0,
+                            children: [
+                              IconButton(
+                                tooltip: 'Edit entry',
+                                icon: const Icon(Icons.edit_outlined),
+                                onPressed: () =>
+                                    _editRecord(binding, entry, fields),
+                              ),
+                              IconButton(
+                                tooltip: 'Delete entry',
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () {
+                                  setState(() => document.deleteRecord(
+                                      binding, entry.index));
+                                  _persistState();
+                                },
+                              ),
+                            ],
+                          )
+                        : null,
+                  );
+                },
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildBreakdown(String label, Map<String, double> values) {
+    final total = values.values.fold<double>(0, (sum, value) => sum + value);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            for (final entry in values.entries) ...[
+              Row(
+                children: [
+                  Expanded(child: Text(entry.key)),
+                  Text('£${entry.value.toStringAsFixed(2)}'),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
+            const Divider(),
+            Row(
+              children: [
+                const Expanded(
+                    child: Text('Total',
+                        style: TextStyle(fontWeight: FontWeight.w800))),
+                Text('£${total.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editRecord(
+    String binding,
+    SproutPreviewRecordEntry entry,
+    List<String> fields,
+  ) async {
+    final controllers = <String, TextEditingController>{
+      for (final field in fields)
+        field:
+            TextEditingController(text: entry.record[field]?.toString() ?? ''),
+    };
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit entry'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final field in fields)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: TextField(
+                    controller: controllers[field],
+                    keyboardType: field == 'amount'
+                        ? const TextInputType.numberWithOptions(decimal: true)
+                        : TextInputType.text,
+                    decoration: InputDecoration(labelText: field),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save changes'),
+          ),
+        ],
+      ),
+    );
+    if (saved == true && mounted) {
+      final updates = <String, Object?>{
+        for (final field in fields)
+          field: field == 'amount'
+              ? double.tryParse(controllers[field]!.text) ?? 0
+              : controllers[field]!.text,
+      };
+      setState(() => _document!.updateRecord(binding, entry.index, updates));
+      _persistState();
+    }
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
   }
 
   Widget _buildProgress(String label, num value, num total, double progress) {

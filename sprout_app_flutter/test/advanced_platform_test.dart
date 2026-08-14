@@ -47,9 +47,31 @@ void main() {
 
     document.activate(button(document, 'View every entry'));
     expect(document.screenName, 'Entries');
+    final recordView = document.currentScreen.elements
+        .whereType<SproutPreviewRecordList>()
+        .single;
+    expect(recordView.searchBinding, 'entrySearch');
+    expect(recordView.filterBinding, 'entryFilter');
+    expect(recordView.editable, isTrue);
+
+    document.updateInput('entrySearch', 'music');
+    document.updateInput('entryFilter', 'Income');
+    final matchingEntries = document.filteredRecordEntries(
+      recordView.binding,
+      recordView.fields,
+      searchBinding: recordView.searchBinding,
+      filterBinding: recordView.filterBinding,
+    );
+    expect(matchingEntries, hasLength(1));
+    expect(matchingEntries.single.record['label'], 'Music subscription');
+    document.updateRecord(
+      recordView.binding,
+      matchingEntries.single.index,
+      {'label': 'Music subscription (annual)'},
+    );
     expect(
-      document.currentScreen.elements.whereType<SproutPreviewRecordList>(),
-      hasLength(1),
+      document.recordListValue('transactions').single['label'],
+      'Music subscription (annual)',
     );
   });
 

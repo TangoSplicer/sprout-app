@@ -118,8 +118,13 @@ impl Parser {
         let progress_regex =
             Regex::new(r#"^progress\s+"([^"]+)"\s+(\w+)\s*/\s*(\w+)$"#).expect("static regex");
         let list_regex = Regex::new(r"^list\s+(\w+)$").expect("static regex");
-        let record_list_regex =
-            Regex::new(r"^records\s+(\w+)\s+\[([^\]]+)\]$").expect("static regex");
+        let record_list_regex = Regex::new(
+            r"^records\s+(\w+)\s+\[([^\]]+)\](?:\s+search\s+(\w+))?(?:\s+filter\s+(\w+))?(?:\s+(editable))?$",
+        )
+        .expect("static regex");
+        let breakdown_regex =
+            Regex::new(r#"^breakdown\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+\[([^\]]+)\]$"#)
+                .expect("static regex");
         let aggregate_regex = Regex::new(
             r#"^aggregate\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+\[([^\]]+)\]\s*-\s*\[([^\]]+)\]$"#,
         )
@@ -265,6 +270,38 @@ impl Parser {
                         .as_str()
                         .to_string(),
                     fields,
+                    search_binding: capture.get(3).map(|value| value.as_str().to_string()),
+                    filter_binding: capture.get(4).map(|value| value.as_str().to_string()),
+                    editable: capture.get(5).is_some(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = breakdown_regex.captures(line) {
+                let kinds = capture
+                    .get(4)
+                    .expect("breakdown kinds capture")
+                    .as_str()
+                    .split(',')
+                    .map(|kind| kind.trim().trim_matches('"').to_string())
+                    .collect();
+                elements.push(UiElement::Breakdown {
+                    label: capture
+                        .get(1)
+                        .expect("breakdown label capture")
+                        .as_str()
+                        .to_string(),
+                    collection: capture
+                        .get(2)
+                        .expect("breakdown collection capture")
+                        .as_str()
+                        .to_string(),
+                    amount_field: capture
+                        .get(3)
+                        .expect("breakdown amount capture")
+                        .as_str()
+                        .to_string(),
+                    kinds,
                 });
                 continue;
             }
@@ -800,6 +837,37 @@ screen Entry {
                 action: Action::AppendRecord { .. },
                 ..
             }
+        ));
+    }
+
+    #[test]
+    fn parses_searchable_editable_records_and_breakdowns() {
+        let source = r#"app "Expense tracker" { start = "Entries" }
+
+screen Entries {
+  state expenses: []
+  state expenseSearch: ""
+  state expenseFilter: "All"
+  ui {
+    choice "Show category" ["All", "Essential", "Flexible"] -> expenseFilter
+    records expenses [kind, label, amount] search expenseSearch filter expenseFilter editable
+    breakdown "By category" expenses amount ["Essential", "Flexible"]
+  }
+}"#;
+        let app = parse_sproutscript(source).expect("advanced record source parses");
+        assert!(matches!(
+            &app.screens[0].ui[1],
+            UiElement::RecordList {
+                search_binding: Some(search),
+                filter_binding: Some(filter),
+                editable: true,
+                ..
+            } if search == "expenseSearch" && filter == "expenseFilter"
+        ));
+        assert!(matches!(
+            &app.screens[0].ui[2],
+            UiElement::Breakdown { kinds, .. }
+                if kinds.len() == 2 && kinds[0] == "Essential" && kinds[1] == "Flexible"
         ));
     }
 

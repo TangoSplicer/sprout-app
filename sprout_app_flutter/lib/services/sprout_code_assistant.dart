@@ -76,12 +76,31 @@ class SproutCodeAssistant {
             'Use a record action and records view when amounts need names, categories, and a durable history.',
       ));
     }
+    if (source.contains('records ') &&
+        !source.contains(' search ') &&
+        !source.contains(' editable')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'Record history can be easier to manage',
+        detail:
+            'Add a local search field and edit controls so people can find, correct, and remove saved entries.',
+        amendment: SproutAmendment.enhanceRecordManager,
+      ));
+    }
     if (source.contains('records ') && !source.contains('aggregate ')) {
       findings.add(const SproutReviewFinding(
         severity: SproutReviewSeverity.hint,
         title: 'Structured records have no calculated view',
         detail:
             'An aggregate can turn a local record collection into a visible total without external code.',
+      ));
+    }
+    if (source.contains('records ') && !source.contains('breakdown ')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'No category breakdown',
+        detail:
+            'A breakdown can make category totals visible alongside a full editable record history.',
       ));
     }
     if (RegExp(r'\bscreen\s+\w+\s*\{').allMatches(source).length > 1 &&
@@ -137,12 +156,31 @@ class SproutCodeAssistant {
           stateLines: const ['state progress: 0', 'state target: 7'],
           uiLine: 'progress "This week" progress / target',
         ),
+      SproutAmendment.enhanceRecordManager => _enhanceFirstRecordList(source),
       SproutAmendment.insertSnippet => source,
     };
   }
 
   String insertSnippet(String source, SproutLanguageSnippet snippet) =>
       _insertIntoFirstUi(source, snippet.source);
+
+  String _enhanceFirstRecordList(String source) {
+    final match = RegExp(
+      r'^(\s*)records\s+(\w+)\s+\[([^\]]+)\]\s*$',
+      multiLine: true,
+    ).firstMatch(source);
+    if (match == null) return source;
+    final enhanced = source.replaceRange(
+      match.start,
+      match.end,
+      '${match.group(1)}records ${match.group(2)} [${match.group(3)}] search recordSearch editable',
+    );
+    return _insertIntoFirstScreen(
+      enhanced,
+      stateLines: const ['state recordSearch: ""'],
+      uiLine: 'label "Use search to find and correct saved entries."',
+    );
+  }
 
   String _insertIntoFirstScreen(
     String source, {
@@ -181,6 +219,7 @@ enum SproutAmendment {
   addChoice,
   addReflection,
   addProgress,
+  enhanceRecordManager,
   insertSnippet,
 }
 

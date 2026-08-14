@@ -56,4 +56,84 @@ screen Settings {
     document.activate(complete);
     expect(document.listValue('todos'), isEmpty);
   });
+
+  test(
+      'editable record views filter, update, delete, calculate, and restore local data',
+      () {
+    final document = SproutPreviewDocument.parse('''app "Expense log" {
+  start = "Entries"
+}
+
+screen Entries {
+  state transactions: []
+  state entrySearch: ""
+  state entryFilter: "All"
+  ui {
+    choice "Show category" ["All", "Essential", "Subscription"] -> entryFilter
+    records transactions [kind, label, amount] search entrySearch filter entryFilter editable
+    breakdown "By category" transactions amount ["Essential", "Subscription"]
+  }
+}''');
+    document.restoreState({
+      'transactions': [
+        {'kind': 'Essential', 'label': 'Groceries', 'amount': 42.5},
+        {'kind': 'Subscription', 'label': 'Music', 'amount': 12.5},
+        {'kind': 'Subscription', 'label': 'Gym', 'amount': 18.0},
+      ],
+    });
+
+    const fields = ['kind', 'label', 'amount'];
+    document.updateInput('entrySearch', 'music');
+    expect(
+      document
+          .filteredRecordEntries('transactions', fields,
+              searchBinding: 'entrySearch')
+          .single
+          .record['label'],
+      'Music',
+    );
+
+    document.updateInput('entrySearch', '');
+    document.updateInput('entryFilter', 'Subscription');
+    final subscriptions = document.filteredRecordEntries(
+      'transactions',
+      fields,
+      searchBinding: 'entrySearch',
+      filterBinding: 'entryFilter',
+    );
+    expect(
+        subscriptions.map((entry) => entry.record['label']), ['Music', 'Gym']);
+
+    document.updateRecord(
+        'transactions', 2, {'label': 'Gym annual', 'amount': 20.0});
+    expect(document.recordListValue('transactions')[2]['label'], 'Gym annual');
+    expect(
+      document.breakdownValues(
+        'transactions',
+        'amount',
+        const ['Essential', 'Subscription'],
+      ),
+      {'Essential': 42.5, 'Subscription': 32.5},
+    );
+
+    document.deleteRecord('transactions', 0);
+    expect(document.recordListValue('transactions'), hasLength(2));
+    expect(
+      document.breakdownValues(
+          'transactions', 'amount', const ['Essential'])['Essential'],
+      0,
+    );
+
+    final restored = SproutPreviewDocument.parse('''app "Expense log" {
+  start = "Entries"
+}
+screen Entries {
+  state transactions: []
+  ui { records transactions [kind, label, amount] editable }
+}''');
+    restored.restoreState(document.exportState());
+    expect(restored.recordListValue('transactions'), hasLength(2));
+    expect(
+        restored.recordListValue('transactions').last['label'], 'Gym annual');
+  });
 }

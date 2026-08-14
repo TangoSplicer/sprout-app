@@ -72,6 +72,16 @@ pub enum UiElement {
     RecordList {
         bind_to: String,
         fields: Vec<String>,
+        search_binding: Option<String>,
+        filter_binding: Option<String>,
+        editable: bool,
+    },
+    /// A calculated category breakdown for selected record kinds.
+    Breakdown {
+        label: String,
+        collection: String,
+        amount_field: String,
+        kinds: Vec<String>,
     },
     /// A computed local total grouped by the bounded `kind` field of records.
     Aggregate {
@@ -399,15 +409,44 @@ impl UiElement {
                     return Err("Progress declaration is invalid".to_string());
                 }
             }
-            UiElement::RecordList { bind_to, fields } => {
+            UiElement::RecordList {
+                bind_to,
+                fields,
+                search_binding,
+                filter_binding,
+                editable: _,
+            } => {
                 if bind_to.len() > 50
                     || fields.is_empty()
                     || fields.len() > 6
                     || fields
                         .iter()
                         .any(|field| field.is_empty() || field.len() > 50)
+                    || search_binding
+                        .as_ref()
+                        .is_some_and(|value| value.len() > 50)
+                    || filter_binding
+                        .as_ref()
+                        .is_some_and(|value| value.len() > 50)
                 {
                     return Err("Record list declaration is invalid".to_string());
+                }
+            }
+            UiElement::Breakdown {
+                label,
+                collection,
+                amount_field,
+                kinds,
+            } => {
+                if label.is_empty()
+                    || label.len() > 120
+                    || collection.len() > 50
+                    || amount_field.len() > 50
+                    || kinds.is_empty()
+                    || kinds.len() > 8
+                    || kinds.iter().any(|kind| kind.is_empty() || kind.len() > 50)
+                {
+                    return Err("Breakdown declaration is invalid".to_string());
                 }
             }
             UiElement::Aggregate {

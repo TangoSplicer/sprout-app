@@ -137,6 +137,65 @@ class SproutPreviewDocument {
     );
   }
 
+  List<SproutPreviewRecordEntry> filteredRecordEntries(
+    String binding,
+    List<String> fields, {
+    String? searchBinding,
+    String? filterBinding,
+  }) {
+    final query = searchBinding == null
+        ? ''
+        : inputValue(searchBinding).trim().toLowerCase();
+    final filter = filterBinding == null
+        ? ''
+        : inputValue(filterBinding).trim().toLowerCase();
+    return recordListValue(binding)
+        .indexed
+        .where((entry) {
+          final record = entry.$2;
+          final matchesQuery = query.isEmpty ||
+              fields.any((field) => (record[field]?.toString() ?? '')
+                  .toLowerCase()
+                  .contains(query));
+          final kind = (record['kind']?.toString() ?? '').toLowerCase();
+          final matchesFilter =
+              filter.isEmpty || filter == 'all' || kind.contains(filter);
+          return matchesQuery && matchesFilter;
+        })
+        .map((entry) => SproutPreviewRecordEntry(entry.$1, entry.$2))
+        .toList(growable: false);
+  }
+
+  void updateRecord(String binding, int index, Map<String, Object?> updates) {
+    final values = List<Object?>.from(_state[binding] as List? ?? const []);
+    if (index < 0 || index >= values.length || values[index] is! Map) return;
+    final record = Map<String, Object?>.from(values[index] as Map);
+    record.addAll(updates);
+    values[index] = record;
+    _state[binding] = values;
+  }
+
+  void deleteRecord(String binding, int index) {
+    final values = List<Object?>.from(_state[binding] as List? ?? const []);
+    if (index < 0 || index >= values.length) return;
+    values.removeAt(index);
+    _state[binding] = values;
+  }
+
+  Map<String, double> breakdownValues(
+    String collection,
+    String amountField,
+    List<String> kinds,
+  ) {
+    return {
+      for (final kind in kinds)
+        kind: recordListValue(collection)
+            .where((record) => record['kind']?.toString() == kind)
+            .fold<double>(
+                0, (total, record) => total + _asNumber(record[amountField])),
+    };
+  }
+
   double aggregateValue(
     String collection,
     String amountField,
@@ -296,7 +355,12 @@ class SproutPreviewDocument {
     final choice = RegExp(r'^choice\s+"([^"]+)"\s+\[([^\]]+)\]\s*->\s*(\w+)$');
     final progress = RegExp(r'^progress\s+"([^"]+)"\s+(\w+)\s*/\s*(\w+)$');
     final list = RegExp(r'^list\s+(\w+)$');
-    final records = RegExp(r'^records\s+(\w+)\s+\[([^\]]+)\]$');
+    final records = RegExp(
+      r'^records\s+(\w+)\s+\[([^\]]+)\](?:\s+search\s+(\w+))?(?:\s+filter\s+(\w+))?(?:\s+(editable))?$',
+    );
+    final breakdown = RegExp(
+      r'^breakdown\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+\[([^\]]+)\]$',
+    );
     final aggregate = RegExp(
       r'^aggregate\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+\[([^\]]+)\]\s*-\s*\[([^\]]+)\]$',
     );
@@ -382,6 +446,24 @@ class SproutPreviewDocument {
               .split(',')
               .map((field) => field.trim())
               .where((field) => field.isNotEmpty)
+              .toList(growable: false),
+          searchBinding: recordsMatch.group(3),
+          filterBinding: recordsMatch.group(4),
+          editable: recordsMatch.group(5) != null,
+        ));
+        continue;
+      }
+      final breakdownMatch = breakdown.firstMatch(line);
+      if (breakdownMatch != null) {
+        elements.add(SproutPreviewBreakdown(
+          label: breakdownMatch.group(1)!,
+          collection: breakdownMatch.group(2)!,
+          amountField: breakdownMatch.group(3)!,
+          kinds: breakdownMatch
+              .group(4)!
+              .split(',')
+              .map((kind) => kind.trim().replaceAll('"', ''))
+              .where((kind) => kind.isNotEmpty)
               .toList(growable: false),
         ));
         continue;
@@ -658,13 +740,40 @@ class SproutPreviewProgress extends SproutPreviewElement {
   });
 }
 
+class SproutPreviewRecordEntry {
+  final int index;
+  final Map<String, Object?> record;
+
+  const SproutPreviewRecordEntry(this.index, this.record);
+}
+
 class SproutPreviewRecordList extends SproutPreviewElement {
   final String binding;
   final List<String> fields;
+  final String? searchBinding;
+  final String? filterBinding;
+  final bool editable;
 
   const SproutPreviewRecordList({
     required this.binding,
     required this.fields,
+    this.searchBinding,
+    this.filterBinding,
+    this.editable = false,
+  });
+}
+
+class SproutPreviewBreakdown extends SproutPreviewElement {
+  final String label;
+  final String collection;
+  final String amountField;
+  final List<String> kinds;
+
+  const SproutPreviewBreakdown({
+    required this.label,
+    required this.collection,
+    required this.amountField,
+    required this.kinds,
   });
 }
 

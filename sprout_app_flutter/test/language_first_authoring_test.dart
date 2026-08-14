@@ -80,6 +80,28 @@ screen Home {
           .firstWhere((snippet) => snippet.title == 'Reflection'),
     );
     expect(withSnippet, contains('textarea "Write a short reflection"'));
+
+    const recordSource = '''app "Records" { start = "Entries" }
+screen Entries {
+  state transactions: []
+  ui {
+    records transactions [kind, label, amount]
+  }
+}''';
+    final recordFinding = assistant.review(recordSource).firstWhere(
+          (finding) =>
+              finding.amendment == SproutAmendment.enhanceRecordManager,
+        );
+    expect(recordFinding.title, 'Record history can be easier to manage');
+    final enhanced =
+        assistant.apply(recordSource, SproutAmendment.enhanceRecordManager);
+    expect(enhanced, contains('state recordSearch: ""'));
+    expect(
+      enhanced,
+      contains(
+        'records transactions [kind, label, amount] search recordSearch editable',
+      ),
+    );
   });
 
   testWidgets('review tools expose local findings and reviewed-source action',

@@ -209,10 +209,32 @@ impl WasmRuntime {
                     self.update_state(total, ValueType::Number(1))?;
                 }
             }
-            UiElement::RecordList { bind_to, fields } => {
+            UiElement::RecordList {
+                bind_to,
+                fields,
+                search_binding,
+                filter_binding,
+                editable: _,
+            } => {
                 self.track_memory_usage(fields.iter().map(String::len).sum());
                 if !self.state.contains_key(bind_to) {
                     self.update_state(bind_to, ValueType::Array(Vec::new()))?;
+                }
+                for binding in [search_binding, filter_binding].into_iter().flatten() {
+                    if !self.state.contains_key(binding) {
+                        self.update_state(binding, ValueType::String(String::new()))?;
+                    }
+                }
+            }
+            UiElement::Breakdown {
+                label,
+                collection,
+                amount_field: _,
+                kinds,
+            } => {
+                self.track_memory_usage(label.len() + kinds.iter().map(String::len).sum::<usize>());
+                if !self.state.contains_key(collection) {
+                    self.update_state(collection, ValueType::Array(Vec::new()))?;
                 }
             }
             UiElement::Aggregate {
