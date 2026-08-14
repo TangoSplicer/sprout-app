@@ -289,6 +289,63 @@ class ProjectService {
     }
   }
 
+  /// Reads a project-owned, JSON-safe application state snapshot. A missing
+  /// snapshot is expected for older projects and simply represents first run.
+  Future<Map<String, dynamic>> readAppState(String projectName) async {
+    try {
+      await _ensureInitialized();
+      final sanitized = _sanitizeName(projectName);
+      final file = File('${_projectsDir.path}/$sanitized/app_state.json');
+      if (!await file.exists()) return <String, dynamic>{};
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map) return <String, dynamic>{};
+      final container = decoded['state'];
+      if (container is! Map) return <String, dynamic>{};
+      return container.map((key, value) => MapEntry('$key', value));
+    } catch (_) {
+      // State recovery must never make source projects inaccessible.
+      return <String, dynamic>{};
+    }
+  }
+
+  /// Saves state atomically in the project directory. The size limit prevents a
+  /// local preview from consuming storage accidentally while preserving privacy.
+  Future<void> writeAppState(
+    String projectName,
+    Map<String, dynamic> state,
+  ) async {
+    try {
+      await _ensureInitialized();
+      final sanitized = _sanitizeName(projectName);
+      final projectDir = Directory('${_projectsDir.path}/$sanitized');
+      if (!await projectDir.exists()) {
+        throw ProjectException('Project does not exist');
+      }
+      final encoded = jsonEncode(state);
+      if (encoded.length > 200000) {
+        throw ProjectException('App data is too large to save locally');
+      }
+      await _writeJsonAtomically(
+        File('${projectDir.path}/app_state.json'),
+        {
+          'schema_version': 1,
+          'updated_at': DateTime.now().toIso8601String(),
+          'state': state,
+        },
+      );
+    } catch (error) {
+      if (error is ProjectException) rethrow;
+      throw ProjectException('Could not save app data: $error');
+    }
+  }
+
+  Future<void> clearAppState(String projectName) async {
+    await _ensureInitialized();
+    final sanitized = _sanitizeName(projectName);
+    final file = File('${_projectsDir.path}/$sanitized/app_state.json');
+    if (await file.exists()) await file.delete();
+  }
+
   Future<ProjectMetadata> getProjectMetadata(String projectName) async {
     try {
       await _ensureInitialized();

@@ -250,6 +250,20 @@ impl CodeGenerator {
                     indent = indent * 4
                 ));
             }
+            Action::AppendRecord { variable, fields } => {
+                let field_list = fields
+                    .iter()
+                    .map(|field| format!("{}: {}", field.name, field.value))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                code.push_str(&format!(
+                    "{:indent$};; Add record {{{}}} to {}\n",
+                    "",
+                    field_list,
+                    variable,
+                    indent = indent * 4
+                ));
+            }
             Action::Increment { variable, by } => {
                 code.push_str(&format!(
                     "{:indent$};; Adjust {} by {}\n",

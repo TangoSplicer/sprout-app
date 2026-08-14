@@ -216,7 +216,10 @@ class _EditorScreenState extends State<EditorScreen> {
                           if (!mounted || !compiled) return;
                           await navigator.push(
                             MaterialPageRoute(
-                              builder: (_) => PreviewScreen(code: previewCode),
+                              builder: (_) => PreviewScreen(
+                                code: previewCode,
+                                projectName: widget.projectName,
+                              ),
                             ),
                           );
                         },

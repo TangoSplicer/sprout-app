@@ -111,11 +111,19 @@ impl Parser {
         let input_regex = Regex::new(r#"^input\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
         let text_area_regex =
             Regex::new(r#"^textarea\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
+        let number_regex =
+            Regex::new(r#"^number\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
         let choice_regex = Regex::new(r#"^choice\s+"([^"]+)"\s+\[([^\]]+)\]\s*->\s*(\w+)$"#)
             .expect("static regex");
         let progress_regex =
             Regex::new(r#"^progress\s+"([^"]+)"\s+(\w+)\s*/\s*(\w+)$"#).expect("static regex");
         let list_regex = Regex::new(r"^list\s+(\w+)$").expect("static regex");
+        let record_list_regex =
+            Regex::new(r"^records\s+(\w+)\s+\[([^\]]+)\]$").expect("static regex");
+        let aggregate_regex = Regex::new(
+            r#"^aggregate\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+\[([^\]]+)\]\s*-\s*\[([^\]]+)\]$"#,
+        )
+        .expect("static regex");
         let section_regex =
             Regex::new(r#"^section\s+"([^"]+)"(?:\s+"([^"]*)")?$"#).expect("static regex");
         let metric_regex =
@@ -181,6 +189,22 @@ impl Parser {
                 continue;
             }
 
+            if let Some(capture) = number_regex.captures(line) {
+                elements.push(UiElement::NumberField {
+                    placeholder: capture
+                        .get(1)
+                        .expect("number label capture")
+                        .as_str()
+                        .to_string(),
+                    bind_to: capture
+                        .get(2)
+                        .expect("number binding capture")
+                        .as_str()
+                        .to_string(),
+                });
+                continue;
+            }
+
             if let Some(capture) = choice_regex.captures(line) {
                 let options = capture
                     .get(2)
@@ -222,6 +246,57 @@ impl Parser {
                         .expect("progress total capture")
                         .as_str()
                         .to_string(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = record_list_regex.captures(line) {
+                let fields = capture
+                    .get(2)
+                    .expect("record-list fields capture")
+                    .as_str()
+                    .split(',')
+                    .map(|field| field.trim().to_string())
+                    .collect();
+                elements.push(UiElement::RecordList {
+                    bind_to: capture
+                        .get(1)
+                        .expect("record-list binding capture")
+                        .as_str()
+                        .to_string(),
+                    fields,
+                });
+                continue;
+            }
+
+            if let Some(capture) = aggregate_regex.captures(line) {
+                let parse_kinds = |index| {
+                    capture
+                        .get(index)
+                        .expect("aggregate kinds capture")
+                        .as_str()
+                        .split(',')
+                        .map(|kind| kind.trim().trim_matches('"').to_string())
+                        .collect()
+                };
+                elements.push(UiElement::Aggregate {
+                    label: capture
+                        .get(1)
+                        .expect("aggregate label capture")
+                        .as_str()
+                        .to_string(),
+                    collection: capture
+                        .get(2)
+                        .expect("aggregate collection capture")
+                        .as_str()
+                        .to_string(),
+                    amount_field: capture
+                        .get(3)
+                        .expect("aggregate amount capture")
+                        .as_str()
+                        .to_string(),
+                    positive_kinds: parse_kinds(4),
+                    negative_kinds: parse_kinds(5),
                 });
                 continue;
             }
@@ -343,6 +418,7 @@ impl Parser {
 
     fn parse_action_block(&self, source: &str) -> Result<Action> {
         let append_regex = Regex::new(r"^(\w+)\.append\((.+)\)$").expect("static regex");
+        let record_regex = Regex::new(r"^(\w+)\.add\((.+)\)$").expect("static regex");
         let remove_regex = Regex::new(r"^(\w+)\.remove\((.+)\)$").expect("static regex");
         let remove_first_regex = Regex::new(r"^(\w+)\.remove_first\(\)$").expect("static regex");
         let reminder_regex = Regex::new(r"^reminder\s+(.+?)\s+at\s+(.+)$").expect("static regex");
@@ -358,7 +434,31 @@ impl Parser {
             if statement.is_empty() || statement.starts_with("//") {
                 continue;
             }
-            if let Some(capture) = append_regex.captures(statement) {
+            if let Some(capture) = record_regex.captures(statement) {
+                let fields = capture
+                    .get(2)
+                    .expect("record fields capture")
+                    .as_str()
+                    .split(',')
+                    .map(|field| {
+                        let (name, value) = field.split_once(':').ok_or_else(|| {
+                            SproutError::Parse("Record fields use name: value".to_string())
+                        })?;
+                        Ok(RecordField {
+                            name: name.trim().to_string(),
+                            value: value.trim().to_string(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                actions.push(Action::AppendRecord {
+                    variable: capture
+                        .get(1)
+                        .expect("record variable capture")
+                        .as_str()
+                        .to_string(),
+                    fields,
+                });
+            } else if let Some(capture) = append_regex.captures(statement) {
                 actions.push(Action::AppendToList {
                     variable: capture
                         .get(1)
@@ -660,6 +760,44 @@ screen Today {
             app.screens[0].ui[7],
             UiElement::Button {
                 action: Action::ClearList { .. },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn parses_structured_records_and_aggregate_totals() {
+        let source = r#"app "Budget" { start = "Dashboard" }
+
+screen Dashboard {
+  state transactions: []
+  ui {
+    aggregate "Balance" transactions amount ["Income"] - ["Outgoings", "Debt"]
+    records transactions [kind, label, amount]
+    button "Add" -> Entry
+  }
+}
+
+screen Entry {
+  state kind: "Income"
+  state label: ""
+  state amount: 0
+  ui {
+    number "Amount" -> amount
+    button "Save" { transactions.add(kind: kind, label: label, amount: amount) }
+  }
+}"#;
+        let app = parse_sproutscript(source).expect("structured budget source parses");
+        assert!(matches!(app.screens[0].ui[0], UiElement::Aggregate { .. }));
+        assert!(matches!(app.screens[0].ui[1], UiElement::RecordList { .. }));
+        assert!(matches!(
+            app.screens[1].ui[0],
+            UiElement::NumberField { .. }
+        ));
+        assert!(matches!(
+            app.screens[1].ui[1],
+            UiElement::Button {
+                action: Action::AppendRecord { .. },
                 ..
             }
         ));

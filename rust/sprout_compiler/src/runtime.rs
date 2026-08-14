@@ -135,7 +135,11 @@ impl WasmRuntime {
 
         // Initialize screen state
         for state_var in &screen.state {
-            self.update_state(&state_var.name, state_var.value.clone())?;
+            // Screen defaults apply only on first visit. Revisiting a screen must
+            // preserve local records and form state created by earlier actions.
+            if !self.state.contains_key(&state_var.name) {
+                self.update_state(&state_var.name, state_var.value.clone())?;
+            }
         }
 
         // Execute UI elements
@@ -164,6 +168,10 @@ impl WasmRuntime {
                 bind_to,
             }
             | UiElement::TextArea {
+                placeholder,
+                bind_to,
+            }
+            | UiElement::NumberField {
                 placeholder,
                 bind_to,
             } => {
@@ -199,6 +207,24 @@ impl WasmRuntime {
                 }
                 if !self.state.contains_key(total) {
                     self.update_state(total, ValueType::Number(1))?;
+                }
+            }
+            UiElement::RecordList { bind_to, fields } => {
+                self.track_memory_usage(fields.iter().map(String::len).sum());
+                if !self.state.contains_key(bind_to) {
+                    self.update_state(bind_to, ValueType::Array(Vec::new()))?;
+                }
+            }
+            UiElement::Aggregate {
+                label,
+                collection,
+                amount_field: _,
+                positive_kinds: _,
+                negative_kinds: _,
+            } => {
+                self.track_memory_usage(label.len());
+                if !self.state.contains_key(collection) {
+                    self.update_state(collection, ValueType::Array(Vec::new()))?;
                 }
             }
             UiElement::Image { source } => {
@@ -292,6 +318,27 @@ impl WasmRuntime {
                 let message = Self::stringify_value(&self.evaluate_expression(message)?);
                 let time = Self::stringify_value(&self.evaluate_expression(time)?);
                 self.log_event(ExecutionEvent::ReminderRequested { message, time });
+            }
+            Action::AppendRecord { variable, fields } => {
+                let mut values = match self.state.get(variable) {
+                    Some(ValueType::Array(values)) => values.clone(),
+                    Some(_) => {
+                        return Err(anyhow::anyhow!(
+                            "State variable is not a list: {}",
+                            variable
+                        ))
+                    }
+                    None => Vec::new(),
+                };
+                if values.len() >= 100 {
+                    return Err(anyhow::anyhow!("List is full: {}", variable));
+                }
+                let mut record = HashMap::new();
+                for field in fields {
+                    record.insert(field.name.clone(), self.evaluate_expression(&field.value)?);
+                }
+                values.push(ValueType::Object(record));
+                self.update_state(variable, ValueType::Array(values))?;
             }
             Action::Increment { variable, by } => {
                 let current = match self.state.get(variable) {

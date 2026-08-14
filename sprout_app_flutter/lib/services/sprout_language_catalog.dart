@@ -163,6 +163,75 @@ screen Guide {
 }''',
     ),
     SproutLanguagePattern(
+      name: 'Month-on-month budget',
+      description:
+          'Track money in, outgoings, debt, and savings across two months with automatic local balances.',
+      icon: Icons.account_balance_wallet_outlined,
+      color: Color(0xFF2C5D82),
+      source: '''app "{{appName}}" {
+  start = "Dashboard"
+}
+
+screen Dashboard {
+  state transactions: []
+  ui {
+    section "Your money, made visible" "Private local planning for January and February."
+    aggregate "January balance" transactions amount ["Income · January"] - ["Outgoings · January", "Debt · January", "Savings · January"]
+    aggregate "February balance" transactions amount ["Income · February"] - ["Outgoings · February", "Debt · February", "Savings · February"]
+    button "Add an entry" -> Entry
+    button "Compare months" -> Compare
+    button "View every entry" -> Entries
+    button "How this planner works" -> Guide
+  }
+}
+
+screen Entry {
+  state kind: "Income · January"
+  state label: ""
+  state amount: 0
+  ui {
+    section "Add a money movement" "Label it clearly so your future self understands it."
+    choice "What is this?" ["Income · January", "Outgoings · January", "Debt · January", "Savings · January", "Income · February", "Outgoings · February", "Debt · February", "Savings · February"] -> kind
+    input "Name, for example Music subscription" -> label
+    number "Amount" -> amount
+    button "Save entry" {
+      transactions.add(kind: kind, label: label, amount: amount)
+      label = ""
+      amount = 0
+      go Dashboard
+    }
+    button "Back to dashboard" { go Back }
+  }
+}
+
+screen Compare {
+  ui {
+    section "Month on month" "Your balances update from every entry you save."
+    aggregate "January balance" transactions amount ["Income · January"] - ["Outgoings · January", "Debt · January", "Savings · January"]
+    aggregate "February balance" transactions amount ["Income · February"] - ["Outgoings · February", "Debt · February", "Savings · February"]
+    button "Add another entry" -> Entry
+    button "Back to dashboard" { go Back }
+  }
+}
+
+screen Entries {
+  ui {
+    section "Every money movement" "Income, subscriptions, debt payments, and savings live together in this private list."
+    records transactions [kind, label, amount]
+    button "Clear all entries" { clear transactions }
+    button "Back to dashboard" { go Back }
+  }
+}
+
+screen Guide {
+  ui {
+    section "Make the budget yours" "Edit categories, labels, months, or add more comparison screens directly in source."
+    label "All app data stays on this device inside this project until you delete it."
+    button "Back to dashboard" { go Back }
+  }
+}''',
+    ),
+    SproutLanguagePattern(
       name: 'Personal planner',
       description:
           'Capture plans, select a priority, and schedule a local nudge.',
@@ -227,6 +296,30 @@ screen Guide {
       title: 'Progress',
       description: 'Display a bounded value against a target.',
       source: 'progress "This week" progress / target',
+    ),
+    SproutLanguageSnippet(
+      title: 'Money field',
+      description:
+          'Collect a local decimal amount for budgets, quantities, or rates.',
+      source: 'number "Amount" -> amount',
+    ),
+    SproutLanguageSnippet(
+      title: 'Record list',
+      description: 'Render structured local entries with selected fields.',
+      source: 'records transactions [kind, label, amount]',
+    ),
+    SproutLanguageSnippet(
+      title: 'Balance total',
+      description:
+          'Calculate a local total using explicit positive and negative record kinds.',
+      source:
+          'aggregate "Monthly balance" transactions amount ["Income"] - ["Outgoings", "Debt", "Savings"]',
+    ),
+    SproutLanguageSnippet(
+      title: 'Save record',
+      description: 'Store a bounded structured entry from named form fields.',
+      source:
+          'button "Save entry" {\n  transactions.add(kind: kind, label: label, amount: amount)\n}',
     ),
     SproutLanguageSnippet(
       title: 'Reminder',

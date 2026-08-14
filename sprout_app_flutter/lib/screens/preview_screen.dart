@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:permission_handler/permission_handler.dart';
@@ -9,8 +11,13 @@ import '../widgets/preview_container.dart';
 
 class PreviewScreen extends StatefulWidget {
   final String code;
+  final String? projectName;
 
-  const PreviewScreen({super.key, required this.code});
+  const PreviewScreen({
+    super.key,
+    required this.code,
+    this.projectName,
+  });
 
   @override
   State<PreviewScreen> createState() => _PreviewScreenState();
@@ -37,6 +44,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
     try {
       await ProjectService().compileCode(widget.code);
       final document = SproutPreviewDocument.parse(widget.code);
+      final projectName = widget.projectName;
+      if (projectName != null) {
+        document.restoreState(await ProjectService().readAppState(projectName));
+      }
       if (!mounted) return;
       setState(() {
         _document = document;
@@ -49,6 +60,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
         _loading = false;
       });
     }
+  }
+
+  void _persistState() {
+    final document = _document;
+    final projectName = widget.projectName;
+    if (document == null || projectName == null) return;
+    unawaited(
+        ProjectService().writeAppState(projectName, document.exportState()));
   }
 
   @override
@@ -166,7 +185,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
           padding: const EdgeInsets.only(bottom: 12),
           child: TextField(
             controller: _controllerFor(binding),
-            onChanged: (value) => document.updateInput(binding, value),
+            onChanged: (value) {
+              document.updateInput(binding, value);
+              _persistState();
+            },
             textInputAction: TextInputAction.done,
             decoration: InputDecoration(
               labelText: placeholder,
@@ -180,11 +202,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
             controller: _controllerFor(binding),
             minLines: 4,
             maxLines: 8,
-            onChanged: (value) => document.updateInput(binding, value),
+            onChanged: (value) {
+              document.updateInput(binding, value);
+              _persistState();
+            },
             decoration: InputDecoration(
               alignLabelWithHint: true,
               labelText: placeholder,
               hintText: placeholder,
+            ),
+          ),
+        ),
+      SproutPreviewNumberInput(:final placeholder, :final binding) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            controller: _controllerFor(binding),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (value) {
+              document.updateInput(binding, value);
+              _persistState();
+            },
+            decoration: InputDecoration(
+              prefixText: '£ ',
+              labelText: placeholder,
+              hintText: '0.00',
             ),
           ),
         ),
@@ -211,9 +252,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
                         label: Text(option),
                         selected:
                             document.choiceValue(binding, options) == option,
-                        onSelected: (_) => setState(
-                          () => document.updateInput(binding, option),
-                        ),
+                        onSelected: (_) {
+                          setState(() => document.updateInput(binding, option));
+                          _persistState();
+                        },
                       ),
                   ],
                 ),
@@ -232,6 +274,24 @@ class _PreviewScreenState extends State<PreviewScreen> {
           document.metricValue(totalBinding),
           document.progressValue(valueBinding, totalBinding),
         ),
+      SproutPreviewRecordList(:final binding, :final fields) =>
+        _buildRecordList(binding, fields),
+      SproutPreviewAggregate(
+        :final label,
+        :final collection,
+        :final amountField,
+        :final positiveKinds,
+        :final negativeKinds,
+      ) =>
+        _buildAggregate(
+          document.resolveTemplate(label),
+          document.aggregateValue(
+            collection,
+            amountField,
+            positiveKinds,
+            negativeKinds,
+          ),
+        ),
       SproutPreviewList(:final binding) => _buildList(binding),
       SproutPreviewSection(:final title, :final detail) => _buildSection(
           document.resolveTemplate(title),
@@ -245,8 +305,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           child: SwitchListTile.adaptive(
             value: document.toggleValue(binding),
-            onChanged: (value) =>
-                setState(() => document.updateToggle(binding, value)),
+            onChanged: (value) {
+              setState(() => document.updateToggle(binding, value));
+              _persistState();
+            },
             title: Text(document.resolveTemplate(label)),
           ),
         ),
@@ -294,6 +356,102 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildAggregate(String label, double value) {
+    final scheme = Theme.of(context).colorScheme;
+    final isPositive = value >= 0;
+    final amount = '£${value.abs().toStringAsFixed(2)}';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: isPositive ? scheme.primaryContainer : scheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              isPositive
+                  ? Icons.savings_outlined
+                  : Icons.account_balance_wallet_outlined,
+              color: isPositive ? scheme.primary : scheme.error,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            Text(
+              '${isPositive ? '' : '-'}$amount',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: isPositive ? scheme.primary : scheme.error,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecordList(String binding, List<String> fields) {
+    final records = _document!.recordListValue(binding);
+    if (records.isEmpty) {
+      return _buildEmptyState(
+          'No entries yet', 'Use the form above to add your first entry.');
+    }
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: records.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final record = records[index];
+          final title = record[fields.first]?.toString() ?? 'Entry';
+          final detail = fields
+              .skip(1)
+              .map((field) {
+                final value = record[field];
+                if (field == 'amount' && value is num) {
+                  return '£${value.toStringAsFixed(2)}';
+                }
+                return value?.toString() ?? '';
+              })
+              .where((value) => value.isNotEmpty)
+              .join(' · ');
+          return ListTile(
+            leading: CircleAvatar(
+              child: Text('${index + 1}'),
+            ),
+            title: Text(title),
+            subtitle: detail.isEmpty ? null : Text(detail),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String title, String detail) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          children: [
+            const Icon(Icons.inbox_outlined),
+            const SizedBox(height: 8),
+            Text(title, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(detail, textAlign: TextAlign.center),
+          ],
+        ),
       ),
     );
   }
@@ -414,6 +572,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
         if (entry.value.text != value) entry.value.text = value;
       }
     });
+
+    _persistState();
 
     for (final effect in effects) {
       if (effect is SproutPreviewReminderRequest) {

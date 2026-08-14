@@ -68,6 +68,32 @@ class SproutCodeAssistant {
         amendment: SproutAmendment.addChoice,
       ));
     }
+    if (source.contains('number ') && !source.contains('records ')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'Numeric field is not stored as a record',
+        detail:
+            'Use a record action and records view when amounts need names, categories, and a durable history.',
+      ));
+    }
+    if (source.contains('records ') && !source.contains('aggregate ')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'Structured records have no calculated view',
+        detail:
+            'An aggregate can turn a local record collection into a visible total without external code.',
+      ));
+    }
+    if (RegExp(r'\bscreen\s+\w+\s*\{').allMatches(source).length > 1 &&
+        !source.contains('go ') &&
+        !source.contains('->')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'Multiple screens need a navigation path',
+        detail:
+            'Add an explicit button target or go action so every important screen is reachable.',
+      ));
+    }
     if (!source.contains('textarea ')) {
       findings.add(const SproutReviewFinding(
         severity: SproutReviewSeverity.hint,

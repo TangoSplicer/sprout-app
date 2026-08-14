@@ -197,6 +197,32 @@ class LanguageServerClient {
             documentation: 'Creates a multi-line editable text surface.',
           ),
           const CompletionItem(
+            label: 'number',
+            kind: CompletionItemKind.function,
+            detail: 'Decimal input',
+            insertText: 'number "\${1:Amount}" -> \${2:amount}',
+            documentation:
+                'Creates a local decimal amount input for budgets, quantities, and rates.',
+          ),
+          const CompletionItem(
+            label: 'records',
+            kind: CompletionItemKind.function,
+            detail: 'Structured collection',
+            insertText:
+                'records \${1:transactions} [\${2:kind}, label, amount]',
+            documentation:
+                'Renders named fields from a local collection of records.',
+          ),
+          const CompletionItem(
+            label: 'aggregate',
+            kind: CompletionItemKind.function,
+            detail: 'Calculated local total',
+            insertText:
+                'aggregate "\${1:Monthly balance}" \${2:transactions} \${3:amount} ["\${4:Income}"] - ["Outgoings", "Debt", "Savings"]',
+            documentation:
+                'Computes a local total from explicit positive and negative record kinds.',
+          ),
+          const CompletionItem(
             label: 'choice',
             kind: CompletionItemKind.function,
             detail: 'Choice chips',

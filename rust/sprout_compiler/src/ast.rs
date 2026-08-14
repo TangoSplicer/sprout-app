@@ -51,6 +51,11 @@ pub enum UiElement {
         placeholder: String,
         bind_to: String,
     },
+    /// A bounded decimal input for amounts, quantities, and rates.
+    NumberField {
+        placeholder: String,
+        bind_to: String,
+    },
     /// A bounded single-choice control with source-defined options.
     Choice {
         label: String,
@@ -62,6 +67,19 @@ pub enum UiElement {
         label: String,
         value: String,
         total: String,
+    },
+    /// A structured local collection rendered with author-selected fields.
+    RecordList {
+        bind_to: String,
+        fields: Vec<String>,
+    },
+    /// A computed local total grouped by the bounded `kind` field of records.
+    Aggregate {
+        label: String,
+        collection: String,
+        amount_field: String,
+        positive_kinds: Vec<String>,
+        negative_kinds: Vec<String>,
     },
     Image {
         source: String,
@@ -87,6 +105,12 @@ pub enum UiElement {
     },
     /// A visual separator for longer task-focused screens.
     Divider,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordField {
+    pub name: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,6 +155,11 @@ pub enum Action {
     /// Empties a declared list state variable without accessing external data.
     ClearList {
         variable: String,
+    },
+    /// Appends a bounded object made from explicit field-to-expression pairs.
+    AppendRecord {
+        variable: String,
+        fields: Vec<RecordField>,
     },
     CallFunction {
         function: String,
@@ -332,6 +361,10 @@ impl UiElement {
             | UiElement::TextArea {
                 placeholder,
                 bind_to,
+            }
+            | UiElement::NumberField {
+                placeholder,
+                bind_to,
             } => {
                 if placeholder.len() > 200 {
                     return Err("Placeholder too long".to_string());
@@ -364,6 +397,35 @@ impl UiElement {
             } => {
                 if label.is_empty() || label.len() > 120 || value.len() > 50 || total.len() > 50 {
                     return Err("Progress declaration is invalid".to_string());
+                }
+            }
+            UiElement::RecordList { bind_to, fields } => {
+                if bind_to.len() > 50
+                    || fields.is_empty()
+                    || fields.len() > 6
+                    || fields
+                        .iter()
+                        .any(|field| field.is_empty() || field.len() > 50)
+                {
+                    return Err("Record list declaration is invalid".to_string());
+                }
+            }
+            UiElement::Aggregate {
+                label,
+                collection,
+                amount_field,
+                positive_kinds,
+                negative_kinds,
+            } => {
+                if label.is_empty()
+                    || label.len() > 120
+                    || collection.len() > 50
+                    || amount_field.len() > 50
+                    || positive_kinds.len() > 8
+                    || negative_kinds.len() > 8
+                    || (positive_kinds.is_empty() && negative_kinds.is_empty())
+                {
+                    return Err("Aggregate declaration is invalid".to_string());
                 }
             }
             UiElement::Image { source } => {
@@ -433,6 +495,16 @@ impl Action {
             Action::RemoveFirstFromList { variable } | Action::ClearList { variable } => {
                 if variable.len() > 50 {
                     return Err("State variable name too long".to_string());
+                }
+            }
+            Action::AppendRecord { variable, fields } => {
+                if variable.len() > 50 || fields.is_empty() || fields.len() > 12 {
+                    return Err("Record action is outside safe bounds".to_string());
+                }
+                if fields.iter().any(|field| {
+                    field.name.is_empty() || field.name.len() > 50 || field.value.len() > 500
+                }) {
+                    return Err("Record field is outside safe bounds".to_string());
                 }
             }
             Action::Increment { variable, by } => {

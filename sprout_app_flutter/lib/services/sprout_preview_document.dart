@@ -71,6 +71,36 @@ class SproutPreviewDocument {
 
   bool get hasVisibleContent => currentScreen.elements.isNotEmpty;
 
+  Map<String, dynamic> exportState() => _state.map(
+        (key, value) => MapEntry(key, _jsonValue(value)),
+      );
+
+  void restoreState(Map<String, dynamic> savedState) {
+    for (final entry in savedState.entries) {
+      if (!RegExp(r'^[A-Za-z_]\w*$').hasMatch(entry.key)) continue;
+      _state[entry.key] = _restoreJsonValue(entry.value);
+    }
+  }
+
+  static dynamic _jsonValue(Object? value) {
+    if (value is Map) {
+      return value.map((key, child) => MapEntry('$key', _jsonValue(child)));
+    }
+    if (value is List) return value.map(_jsonValue).toList(growable: false);
+    return value;
+  }
+
+  static Object? _restoreJsonValue(Object? value) {
+    if (value is Map) {
+      return value
+          .map((key, child) => MapEntry('$key', _restoreJsonValue(child)));
+    }
+    if (value is List) {
+      return value.map(_restoreJsonValue).toList(growable: false);
+    }
+    return value;
+  }
+
   String inputValue(String binding) => (_state[binding] as String?) ?? '';
 
   bool toggleValue(String binding) => (_state[binding] as bool?) ?? false;
@@ -91,9 +121,39 @@ class SproutPreviewDocument {
 
   List<String> listValue(String binding) {
     final value = _state[binding];
-    if (value is List<String>) return List.unmodifiable(value);
+    if (value is List) {
+      return List.unmodifiable(value.whereType<String>());
+    }
     return const [];
   }
+
+  List<Map<String, Object?>> recordListValue(String binding) {
+    final value = _state[binding];
+    if (value is! List) return const [];
+    return List.unmodifiable(
+      value.whereType<Map>().map(
+            (record) => Map<String, Object?>.from(record),
+          ),
+    );
+  }
+
+  double aggregateValue(
+    String collection,
+    String amountField,
+    List<String> positiveKinds,
+    List<String> negativeKinds,
+  ) {
+    return recordListValue(collection).fold<double>(0, (total, record) {
+      final kind = record['kind']?.toString();
+      final amount = _asNumber(record[amountField]);
+      if (positiveKinds.contains(kind)) return total + amount;
+      if (negativeKinds.contains(kind)) return total - amount;
+      return total;
+    });
+  }
+
+  double _asNumber(Object? value) =>
+      value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
 
   void updateInput(String binding, String value) {
     _state[binding] = value.length > 1000 ? value.substring(0, 1000) : value;
@@ -133,17 +193,35 @@ class SproutPreviewDocument {
         _state[variable] = _resolveExpression(expression);
         return null;
       case SproutPreviewAppend(:final variable, :final expression):
-        final values = List<String>.from(listValue(variable));
+        final values =
+            List<Object?>.from(_state[variable] as List? ?? const []);
         if (values.length < 100) values.add(_resolveExpression(expression));
         _state[variable] = values;
         return null;
+      case SproutPreviewAppendRecord(:final variable, :final fields):
+        final values =
+            List<Object?>.from(_state[variable] as List? ?? const []);
+        if (values.length < 100) {
+          final record = <String, Object?>{};
+          for (final field in fields.entries) {
+            final resolved = _resolveExpression(field.value);
+            record[field.key] = field.key == 'amount'
+                ? double.tryParse(resolved) ?? 0
+                : resolved;
+          }
+          values.add(record);
+        }
+        _state[variable] = values;
+        return null;
       case SproutPreviewRemove(:final variable, :final expression):
-        final values = List<String>.from(listValue(variable));
+        final values =
+            List<Object?>.from(_state[variable] as List? ?? const []);
         values.remove(_resolveExpression(expression));
         _state[variable] = values;
         return null;
       case SproutPreviewRemoveFirst(:final variable):
-        final values = List<String>.from(listValue(variable));
+        final values =
+            List<Object?>.from(_state[variable] as List? ?? const []);
         if (values.isNotEmpty) values.removeAt(0);
         _state[variable] = values;
         return null;
@@ -196,7 +274,7 @@ class SproutPreviewDocument {
   }
 
   static Object? _parseStateValue(String value) {
-    if (value == '[]') return <String>[];
+    if (value == '[]') return <Object?>[];
     if (value == 'true') return true;
     if (value == 'false') return false;
     final integer = int.tryParse(value);
@@ -214,9 +292,14 @@ class SproutPreviewDocument {
     final legacyLabel = RegExp(r'^(?:label|title)\("([^"]*)"\)$');
     final input = RegExp(r'^input\s+"([^"]+)"\s*->\s*(\w+)$');
     final textArea = RegExp(r'^textarea\s+"([^"]+)"\s*->\s*(\w+)$');
+    final number = RegExp(r'^number\s+"([^"]+)"\s*->\s*(\w+)$');
     final choice = RegExp(r'^choice\s+"([^"]+)"\s+\[([^\]]+)\]\s*->\s*(\w+)$');
     final progress = RegExp(r'^progress\s+"([^"]+)"\s+(\w+)\s*/\s*(\w+)$');
     final list = RegExp(r'^list\s+(\w+)$');
+    final records = RegExp(r'^records\s+(\w+)\s+\[([^\]]+)\]$');
+    final aggregate = RegExp(
+      r'^aggregate\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+\[([^\]]+)\]\s*-\s*\[([^\]]+)\]$',
+    );
     final section = RegExp(r'^section\s+"([^"]+)"(?:\s+"([^"]*)")?$');
     final metric = RegExp(r'^metric\s+"([^"]+)"\s*->\s*(\w+)$');
     final toggle = RegExp(r'^toggle\s+"([^"]+)"\s*->\s*(\w+)$');
@@ -258,6 +341,14 @@ class SproutPreviewDocument {
         ));
         continue;
       }
+      final numberMatch = number.firstMatch(line);
+      if (numberMatch != null) {
+        elements.add(SproutPreviewNumberInput(
+          placeholder: numberMatch.group(1)!,
+          binding: numberMatch.group(2)!,
+        ));
+        continue;
+      }
       final choiceMatch = choice.firstMatch(line);
       if (choiceMatch != null) {
         final options = choiceMatch
@@ -279,6 +370,36 @@ class SproutPreviewDocument {
           label: progressMatch.group(1)!,
           valueBinding: progressMatch.group(2)!,
           totalBinding: progressMatch.group(3)!,
+        ));
+        continue;
+      }
+      final recordsMatch = records.firstMatch(line);
+      if (recordsMatch != null) {
+        elements.add(SproutPreviewRecordList(
+          binding: recordsMatch.group(1)!,
+          fields: recordsMatch
+              .group(2)!
+              .split(',')
+              .map((field) => field.trim())
+              .where((field) => field.isNotEmpty)
+              .toList(growable: false),
+        ));
+        continue;
+      }
+      final aggregateMatch = aggregate.firstMatch(line);
+      if (aggregateMatch != null) {
+        List<String> kinds(int group) => aggregateMatch
+            .group(group)!
+            .split(',')
+            .map((kind) => kind.trim().replaceAll('"', ''))
+            .where((kind) => kind.isNotEmpty)
+            .toList(growable: false);
+        elements.add(SproutPreviewAggregate(
+          label: aggregateMatch.group(1)!,
+          collection: aggregateMatch.group(2)!,
+          amountField: aggregateMatch.group(3)!,
+          positiveKinds: kinds(4),
+          negativeKinds: kinds(5),
         ));
         continue;
       }
@@ -351,6 +472,7 @@ class SproutPreviewDocument {
   static List<SproutPreviewAction> _parseActions(String source) {
     final actions = <SproutPreviewAction>[];
     final append = RegExp(r'^(\w+)\.append\((.+)\)$');
+    final record = RegExp(r'^(\w+)\.add\((.+)\)$');
     final remove = RegExp(r'^(\w+)\.remove\((.+)\)$');
     final removeFirst = RegExp(r'^(\w+)\.remove_first\(\)$');
     final reminder = RegExp(r'^reminder\s+(.+?)\s+at\s+(.+)$');
@@ -362,6 +484,21 @@ class SproutPreviewDocument {
     for (final statement in source.split(RegExp(r'[\n;]'))) {
       final value = statement.trim();
       if (value.isEmpty || value.startsWith('//')) continue;
+      final recordMatch = record.firstMatch(value);
+      if (recordMatch != null) {
+        final fields = <String, String>{};
+        for (final field in recordMatch.group(2)!.split(',')) {
+          final parts = field.split(':');
+          if (parts.length == 2 && parts.first.trim().isNotEmpty) {
+            fields[parts.first.trim()] = parts.last.trim();
+          }
+        }
+        actions.add(SproutPreviewAppendRecord(
+          recordMatch.group(1)!,
+          fields,
+        ));
+        continue;
+      }
       final appendMatch = append.firstMatch(value);
       final removeMatch = remove.firstMatch(value);
       final removeFirstMatch = removeFirst.firstMatch(value);
@@ -487,6 +624,16 @@ class SproutPreviewTextArea extends SproutPreviewElement {
       {required this.placeholder, required this.binding});
 }
 
+class SproutPreviewNumberInput extends SproutPreviewElement {
+  final String placeholder;
+  final String binding;
+
+  const SproutPreviewNumberInput({
+    required this.placeholder,
+    required this.binding,
+  });
+}
+
 class SproutPreviewChoice extends SproutPreviewElement {
   final String label;
   final List<String> options;
@@ -508,6 +655,32 @@ class SproutPreviewProgress extends SproutPreviewElement {
     required this.label,
     required this.valueBinding,
     required this.totalBinding,
+  });
+}
+
+class SproutPreviewRecordList extends SproutPreviewElement {
+  final String binding;
+  final List<String> fields;
+
+  const SproutPreviewRecordList({
+    required this.binding,
+    required this.fields,
+  });
+}
+
+class SproutPreviewAggregate extends SproutPreviewElement {
+  final String label;
+  final String collection;
+  final String amountField;
+  final List<String> positiveKinds;
+  final List<String> negativeKinds;
+
+  const SproutPreviewAggregate({
+    required this.label,
+    required this.collection,
+    required this.amountField,
+    required this.positiveKinds,
+    required this.negativeKinds,
   });
 }
 
@@ -571,6 +744,13 @@ class SproutPreviewAppend extends SproutPreviewAction {
   final String expression;
 
   const SproutPreviewAppend(this.variable, this.expression);
+}
+
+class SproutPreviewAppendRecord extends SproutPreviewAction {
+  final String variable;
+  final Map<String, String> fields;
+
+  const SproutPreviewAppendRecord(this.variable, this.fields);
 }
 
 class SproutPreviewRemove extends SproutPreviewAction {
