@@ -560,71 +560,34 @@ class ProjectService {
   }
 
   String _getSecureProjectTemplate(String name) {
-    return '''// Sprout App: $name
-// Generated: ${DateTime.now().toIso8601String()}
-// Security Level: Strict
-
-app "$name" {
+    return '''app "$name" {
   start = "Home"
-  version = "1.0.0"
 }
 
 screen Home {
-  state message = "Hello, $name!"
-  state count = 0
-  state isEnabled = true
-
+  state checkIns: 0
+  state nextStep: ""
+  state savedSteps: []
   ui {
-    column {
-      title "\${message}"
-      
-      label "Welcome to your Sprout app!"
-      label "Count: \${count}"
-      
-      row {
-        button "Increment" {
-          count = count + 1
-          message = "Count updated!"
-        }
-        
-        button "Reset" {
-          count = 0
-          message = "Reset complete"
-        }
-      }
-      
-      if isEnabled {
-        button "Disable Counter" {
-          isEnabled = false
-          message = "Counter disabled"
-        }
-      } else {
-        button "Enable Counter" {
-          isEnabled = true  
-          message = "Counter enabled"
-        }
-      }
-      
-      button "About" {
-        -> About
-      }
+    section "Welcome to $name" "Start with one useful action, then reshape this app in the editor."
+    metric "Check-ins" -> checkIns
+    input "What would make this app useful today?" -> nextStep
+    button "Save this step" {
+      savedSteps.append(nextStep)
+      nextStep = ""
+      increment checkIns
     }
+    list savedSteps
+    button "Clear saved steps" { clear savedSteps }
+    button "Learn how to extend this app" -> Guide
   }
 }
 
-screen About {
+screen Guide {
   ui {
-    column {
-      title "About $name"
-      
-      label "This is a Sprout application."
-      label "Built with security and privacy in mind."
-      label "All code runs locally on your device."
-      
-      button "Back to Home" {
-        -> Home
-      }
-    }
+    section "This is your starting point" "Add screens, forms, records, calculations, sharing-ready workflows, and more from the language tools."
+    label "Every Sprout app stays editable and runs locally inside the secure Sprout runtime."
+    button "Back to your app" { go Back }
   }
 }
 ''';
@@ -693,46 +656,6 @@ Open this project in the Sprout app to edit and run it.
 
 Built with ❤️ using Sprout
 ''';
-  }
-}
-
-// Secure installation service
-class InstallService {
-  static Future<void> installApp(String projectName) async {
-    try {
-      if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(projectName)) {
-        throw InstallException('Invalid project name for installation');
-      }
-
-      final projectService = ProjectService();
-
-      // Read and validate project
-      final code = await projectService.readFile(projectName, 'main.sprout');
-
-      // Compile with security checks
-      final wasm = await projectService.compileCode(code);
-
-      if (wasm.isEmpty) {
-        throw InstallException('Compilation failed');
-      }
-
-      // Create local APK structure (backend-free approach)
-      await _createLocalInstallation(projectName, wasm);
-    } catch (e) {
-      throw InstallException('Installation failed: $e');
-    }
-  }
-
-  static Future<void> _createLocalInstallation(
-      String projectName, List<int> wasm) async {
-    // This would create a local app structure that can be "installed"
-    // For now, simulate the process
-    await Future.delayed(const Duration(seconds: 2));
-
-    // In a real implementation, this could:
-    // 1. Create an Android APK structure locally
-    // 2. Use platform-specific installation APIs
-    // 3. Register the app with the system launcher
   }
 }
 
@@ -806,14 +729,6 @@ class CompileException implements Exception {
 
   @override
   String toString() => 'CompileException: $message';
-}
-
-class InstallException implements Exception {
-  final String message;
-  InstallException(this.message);
-
-  @override
-  String toString() => 'InstallException: $message';
 }
 
 class SecurityException implements Exception {

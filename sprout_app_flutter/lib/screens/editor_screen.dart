@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/debugger.dart';
 import '../services/language_server.dart';
+import '../services/native_bridge.dart';
 import '../services/project_service.dart';
 import '../widgets/debug_console.dart';
 import '../widgets/syntax_editor.dart';
@@ -97,6 +98,28 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
+  Future<void> _addToHomeScreen() async {
+    final saved = await _save(announce: false);
+    if (!saved || !mounted) return;
+    try {
+      final requested =
+          await NativeBridge.requestAppShortcut(widget.projectName);
+      if (!mounted) return;
+      _showMessage(
+        requested
+            ? 'Android will now offer ${widget.projectName} as a home-screen app.'
+            : 'Your launcher does not support adding this Sprout app to the home screen.',
+        error: !requested,
+      );
+    } catch (_) {
+      if (mounted) {
+        _showMessage(
+            'Home-screen apps are available on a supported Android launcher.',
+            error: true);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
@@ -117,6 +140,11 @@ class _EditorScreenState extends State<EditorScreen> {
             icon: Icon(_showConsole ? Icons.terminal : Icons.terminal_outlined),
             tooltip: _showConsole ? 'Hide activity log' : 'Show activity log',
             onPressed: () => setState(() => _showConsole = !_showConsole),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_to_home_screen_outlined),
+            tooltip: 'Add this app to your home screen',
+            onPressed: _addToHomeScreen,
           ),
           IconButton(
             icon: const Icon(Icons.share_outlined),

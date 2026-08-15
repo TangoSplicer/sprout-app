@@ -2,19 +2,29 @@ package com.sproutapp.sprout
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.fragment.app.FragmentActivity
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileOutputStream
 import java.security.KeyStore
+import java.security.MessageDigest
 import java.util.concurrent.Executor
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -26,10 +36,24 @@ class MainActivity: FlutterFragmentActivity() {
     private lateinit var executor: Executor
     private lateinit var biometricPrompt: BiometricPrompt
     private lateinit var promptInfo: BiometricPrompt.PromptInfo
-    
+    private var nativeChannel: MethodChannel? = null
+    private var pendingIncomingPackage: String? = null
+    private var pendingLaunchProject: String? = null
+
     // Security: KeyStore for cryptographic operations
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply {
         load(null)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        captureLaunchIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        captureLaunchIntent(intent)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -90,8 +114,40 @@ class MainActivity: FlutterFragmentActivity() {
             }
         }
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NATIVE_CHANNEL).setMethodCallHandler { call, result ->
+        nativeChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NATIVE_CHANNEL)
+        nativeChannel!!.setMethodCallHandler { call, result ->
             when (call.method) {
+                "shareAppPackage" -> {
+                    val packagePath = call.argument<String>("path")
+                    if (packagePath.isNullOrBlank()) {
+                        result.error("INVALID_ARGUMENT", "A package path is required", null)
+                    } else {
+                        try {
+                            shareAppPackage(packagePath)
+                            result.success(null)
+                        } catch (error: Exception) {
+                            result.error("SHARE_FAILED", error.message, null)
+                        }
+                    }
+                }
+                "consumeIncomingAppPackage" -> {
+                    val packagePath = pendingIncomingPackage
+                    pendingIncomingPackage = null
+                    result.success(packagePath)
+                }
+                "consumeLaunchProject" -> {
+                    val projectName = pendingLaunchProject
+                    pendingLaunchProject = null
+                    result.success(projectName)
+                }
+                "requestAppShortcut" -> {
+                    val projectName = call.argument<String>("projectName")?.trim()
+                    if (projectName.isNullOrEmpty() || projectName.length > 80) {
+                        result.error("INVALID_ARGUMENT", "A valid project name is required", null)
+                    } else {
+                        result.success(requestAppShortcut(projectName))
+                    }
+                }
                 "scheduleAlarm" -> {
                     val message = call.argument<String>("message")?.trim()
                     val timestamp = call.argument<Number>("timestamp")?.toLong()
@@ -111,6 +167,93 @@ class MainActivity: FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun captureLaunchIntent(launchIntent: Intent?) {
+        if (launchIntent == null) return
+        val shortcutProject = launchIntent.getStringExtra(EXTRA_PROJECT_NAME)?.trim()
+        if (!shortcutProject.isNullOrEmpty() && shortcutProject.length <= 80) {
+            pendingLaunchProject = shortcutProject
+            nativeChannel?.invokeMethod("proxyLaunchRequested", shortcutProject)
+        }
+
+        val incomingUri = when (launchIntent.action) {
+            Intent.ACTION_SEND -> launchIntent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            Intent.ACTION_VIEW -> launchIntent.data
+            else -> null
+        }
+        if (incomingUri != null) {
+            try {
+                pendingIncomingPackage = copyIncomingPackage(incomingUri)
+                nativeChannel?.invokeMethod("incomingAppPackage", pendingIncomingPackage)
+            } catch (_: Exception) {
+                // Dart validates the archive. Invalid or oversized external content is ignored.
+            }
+        }
+    }
+
+    private fun copyIncomingPackage(uri: Uri): String {
+        val destination = File(cacheDir, "incoming_${System.currentTimeMillis()}.sproutapp")
+        var totalBytes = 0
+        contentResolver.openInputStream(uri).use { input ->
+            if (input == null) throw IllegalArgumentException("Unable to read the shared package")
+            FileOutputStream(destination).use { output ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count == -1) break
+                    totalBytes += count
+                    if (totalBytes > MAX_PACKAGE_BYTES) {
+                        destination.delete()
+                        throw IllegalArgumentException("Shared package is too large")
+                    }
+                    output.write(buffer, 0, count)
+                }
+            }
+        }
+        if (totalBytes == 0) {
+            destination.delete()
+            throw IllegalArgumentException("Shared package is empty")
+        }
+        return destination.absolutePath
+    }
+
+    private fun shareAppPackage(packagePath: String) {
+        val packageFile = File(packagePath)
+        if (!packageFile.isFile || packageFile.length() !in 1..MAX_PACKAGE_BYTES ||
+            !packageFile.name.endsWith(".sproutapp", ignoreCase = true)) {
+            throw IllegalArgumentException("The selected app package is unavailable")
+        }
+        val uri = FileProvider.getUriForFile(this, "$packageName.sproutfiles", packageFile)
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/vnd.sprout.app+gzip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("Sprout app package", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(shareIntent, "Share Sprout app"))
+    }
+
+    private fun requestAppShortcut(projectName: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val manager = getSystemService(ShortcutManager::class.java) ?: return false
+        if (!manager.isRequestPinShortcutSupported) return false
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(projectName.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
+            .take(24)
+        val launchIntent = Intent(this, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            putExtra(EXTRA_PROJECT_NAME, projectName)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val shortcut = ShortcutInfo.Builder(this, "sprout_$digest")
+            .setShortLabel(projectName.take(25))
+            .setLongLabel("Open $projectName in Sprout")
+            .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
+            .setIntent(launchIntent)
+            .build()
+        return manager.requestPinShortcut(shortcut, null)
     }
 
     private fun scheduleReminder(message: String, timestamp: Long) {
@@ -231,6 +374,11 @@ class MainActivity: FlutterFragmentActivity() {
     }
 
     // Security: Prevent screenshots of sensitive screens
+    companion object {
+        private const val EXTRA_PROJECT_NAME = "sprout_project_name"
+        private const val MAX_PACKAGE_BYTES = 2 * 1024 * 1024
+    }
+
     override fun onResume() {
         super.onResume()
         window.setFlags(

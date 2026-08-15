@@ -1,11 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import '../services/native_bridge.dart';
 import '../services/project_service.dart';
 import '../theme/sprout_theme.dart';
 import 'editor_screen.dart';
+import 'import_app_screen.dart';
 import 'learning_screen.dart';
+import 'preview_screen.dart';
 import 'project_template_screen.dart';
 import 'settings_screen.dart';
+import 'share_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,11 +28,19 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     ProjectService().projectChanges.addListener(_refreshProjects);
     _projectsFuture = ProjectService().loadProjectNames();
+    NativeBridge.setPlatformLaunchHandlers(
+      onIncomingPackage: _handleIncomingPackage,
+      onProxyLaunch: _openProxyProject,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _consumePendingPlatformActions();
+    });
   }
 
   @override
   void dispose() {
     ProjectService().projectChanges.removeListener(_refreshProjects);
+    NativeBridge.setPlatformLaunchHandlers();
     super.dispose();
   }
 
@@ -41,6 +55,123 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (_) => const ProjectTemplateScreen()),
     );
     if (mounted) _refreshProjects();
+  }
+
+  Future<void> _openImport({File? initialFile}) async {
+    final importedName = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ImportAppScreen(initialFile: initialFile),
+      ),
+    );
+    if (!mounted) return;
+    if (importedName != null) {
+      _refreshProjects();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$importedName was added to your projects.')),
+      );
+    }
+  }
+
+  Future<void> _handleIncomingPackage(String packagePath) async {
+    if (!mounted) return;
+    await _openImport(initialFile: File(packagePath));
+  }
+
+  Future<void> _openProxyProject(String projectName) async {
+    await _runProject(
+      projectName,
+      missingMessage: 'This home-screen app is no longer available in Sprout.',
+    );
+  }
+
+  Future<void> _runProject(
+    String projectName, {
+    String missingMessage = 'This app is no longer available in Sprout.',
+  }) async {
+    final projects = await ProjectService().loadProjectNames();
+    if (!mounted) return;
+    if (!projects.contains(projectName)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(missingMessage)));
+      return;
+    }
+    try {
+      final source =
+          await ProjectService().readFile(projectName, 'main.sprout');
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PreviewScreen(code: source, projectName: projectName),
+        ),
+      );
+      if (mounted) _refreshProjects();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('This app could not be opened right now.')),
+      );
+    }
+  }
+
+  Future<void> _handleProjectAction(
+    _ProjectAction action,
+    String projectName,
+  ) async {
+    switch (action) {
+      case _ProjectAction.run:
+        await _runProject(projectName);
+        return;
+      case _ProjectAction.share:
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ShareScreen(projectName: projectName)),
+        );
+        return;
+      case _ProjectAction.addToHome:
+        try {
+          final requested = await NativeBridge.requestAppShortcut(projectName);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                requested
+                    ? 'Android will now offer $projectName as a home-screen app.'
+                    : 'Your launcher does not support adding this app to the home screen.',
+              ),
+            ),
+          );
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content:
+                    Text('Home-screen apps need a supported Android launcher.'),
+              ),
+            );
+          }
+        }
+        return;
+    }
+  }
+
+  Future<void> _consumePendingPlatformActions() async {
+    try {
+      final packagePath = await NativeBridge.consumeIncomingAppPackage();
+      if (packagePath != null && mounted) {
+        await _handleIncomingPackage(packagePath);
+      }
+      final projectName = await NativeBridge.consumeLaunchProject();
+      if (projectName != null && mounted) {
+        await _openProxyProject(projectName);
+      }
+    } catch (_) {
+      // Desktop, browser, and widget-test targets have no Android bridge.
+    }
   }
 
   @override
@@ -63,6 +194,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh projects',
             onPressed: _refreshProjects,
+          ),
+          IconButton(
+            icon: const Icon(Icons.move_to_inbox_outlined),
+            tooltip: 'Add a shared app',
+            onPressed: () => _openImport(),
           ),
           IconButton(
             icon: const Icon(Icons.school_outlined),
@@ -118,6 +254,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: const Text('Create an app'),
                       ),
                       OutlinedButton.icon(
+                        onPressed: () => _openImport(),
+                        icon: const Icon(Icons.move_to_inbox_outlined),
+                        label: const Text('Add a shared app'),
+                      ),
+                      TextButton.icon(
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -184,8 +325,35 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const TextStyle(fontWeight: FontWeight.w800)),
                           subtitle:
                               const Text('Open, edit, and preview this app'),
-                          trailing: const Icon(Icons.arrow_forward_ios_rounded,
-                              size: 18),
+                          trailing: PopupMenuButton<_ProjectAction>(
+                            tooltip: 'App actions',
+                            onSelected: (action) =>
+                                _handleProjectAction(action, project),
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: _ProjectAction.run,
+                                child: ListTile(
+                                  leading: Icon(Icons.play_arrow_rounded),
+                                  title: Text('Run app'),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: _ProjectAction.share,
+                                child: ListTile(
+                                  leading: Icon(Icons.ios_share_outlined),
+                                  title: Text('Share app'),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: _ProjectAction.addToHome,
+                                child: ListTile(
+                                  leading:
+                                      Icon(Icons.add_to_home_screen_outlined),
+                                  title: Text('Add to home screen'),
+                                ),
+                              ),
+                            ],
+                          ),
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -217,6 +385,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+enum _ProjectAction { run, share, addToHome }
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
