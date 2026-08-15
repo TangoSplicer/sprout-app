@@ -32,8 +32,7 @@ class LearningScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sprout turns a simple description into a small personal tool. '
-                  'You can safely inspect, adjust, and preview it before sharing.',
+                  'Start from a working local pattern, make it yours, and safely preview it before sharing a complete copy with someone else.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: scheme.onPrimaryContainer,
                       ),
@@ -50,41 +49,41 @@ class LearningScreen extends StatelessWidget {
           const _LessonCard(
             number: '1',
             icon: Icons.add_circle_outline,
-            title: 'Create a small app',
+            title: 'Choose a working starting point',
             body:
-                'Choose New App and give your tool a clear name, such as “Weekly Tasks”.',
+                'Create an app, give it a clear name, and pick a useful local pattern such as a goal tracker, budget, or contact organiser.',
           ),
           const _LessonCard(
             number: '2',
-            icon: Icons.smart_toy_outlined,
-            title: 'Ask for a starter',
+            icon: Icons.play_arrow_outlined,
+            title: 'Use it before changing it',
             body:
-                'In the editor, select the AI button and describe what you need: “A ranked todo list for my week.”',
+                'Choose Run my app to try the forms, buttons, calculations, and saved local data straight away.',
           ),
           const _LessonCard(
             number: '3',
-            icon: Icons.check_circle_outline,
-            title: 'Use and save it',
+            icon: Icons.code_outlined,
+            title: 'Change only what you need',
             body:
-                'Choose Use to replace the starter code. Sprout saves the accepted version to your project automatically.',
+                'Open the source when you are ready. Language review and reusable snippets help you add controls without starting from scratch.',
           ),
           const _LessonCard(
             number: '4',
             icon: Icons.play_circle_outline,
             title: 'Preview before you rely on it',
             body:
-                'Tap Run to check the labels and buttons your app will show. Return to the editor whenever you want to refine it.',
+                'Run the same interactive experience other people will use. Your changes and app data save locally to this project.',
           ),
           const _LessonCard(
             number: '5',
             icon: Icons.share_outlined,
-            title: 'Keep growing',
+            title: 'Share or add it to your home screen',
             body:
-                'Use Share when you are ready to give a copy to someone else. Start with one useful screen and improve it over time.',
+                'Share a complete editable app package with another Sprout user, or add a named home-screen icon that opens your app in Sprout.',
           ),
           const SizedBox(height: 12),
           Text(
-            'Tip: short, specific requests create the clearest starting point. You stay in control of every change.',
+            'Tip: begin with a pattern that already works, then make one useful change at a time. You remain in control of every screen, record, and shared package.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),

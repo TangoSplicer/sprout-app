@@ -96,6 +96,30 @@ void main() {
         2200);
   });
 
+  test(
+      'project service serializes rapid app-state writes so the newest data wins',
+      () async {
+    final root = await Directory.systemTemp.createTemp('sprout_state_queue_');
+    final service = ProjectService();
+    await service.useStorageDirectoryForTesting(root);
+    addTearDown(() async {
+      service.resetStorageDirectoryForTesting();
+      await root.delete(recursive: true);
+    });
+
+    await service.createProject('Queued app');
+    await Future.wait([
+      service.writeAppState('Queued app', {'draft': 'first'}),
+      service.writeAppState('Queued app', {'draft': 'second'}),
+      service.writeAppState('Queued app', {'draft': 'latest', 'count': 3}),
+    ]);
+
+    expect(await service.readAppState('Queued app'), {
+      'draft': 'latest',
+      'count': 3,
+    });
+  });
+
   test('project service preserves a JSON-safe app-state snapshot', () async {
     final root = await Directory.systemTemp.createTemp('sprout_state_test_');
     final service = ProjectService();

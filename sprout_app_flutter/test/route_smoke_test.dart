@@ -11,7 +11,7 @@ void main() {
 
     expect(find.text('Start with an idea, not code.'), findsOneWidget);
     expect(find.text('Your first five minutes'), findsOneWidget);
-    expect(find.text('Create a small app'), findsOneWidget);
+    expect(find.text('Choose a working starting point'), findsOneWidget);
   });
 
   testWidgets('template route presents compile-safe starter choices',

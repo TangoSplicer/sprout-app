@@ -156,6 +156,8 @@ class SproutAppPackageService {
       throw const SproutPackageException(
           'The project source did not pass package integrity checks.');
     }
+    final source = utf8.decode(sourceBytes, allowMalformed: false);
+    _validateSourceEnvelope(source);
     final stateFile = files[_stateFile];
     if (manifest.includesAppState != (stateFile != null)) {
       throw const SproutPackageException(
@@ -178,7 +180,7 @@ class SproutAppPackageService {
     }
     return SproutPackagePreview(
       manifest: manifest,
-      source: utf8.decode(sourceBytes, allowMalformed: false),
+      source: source,
       appState: appState,
     );
   }
@@ -245,6 +247,17 @@ class SproutAppPackageService {
 
   static bool _isAllowedPackagePath(String name) =>
       name == _manifestFile || name == _sourceFile || name == _stateFile;
+
+  static void _validateSourceEnvelope(String source) {
+    if (source.trim().isEmpty ||
+        !RegExp(r'^\s*app\s+"[^"]+"\s*\{', multiLine: true).hasMatch(source) ||
+        !RegExp(r'^\s*screen\s+[A-Za-z_]\w*\s*\{', multiLine: true)
+            .hasMatch(source)) {
+      throw const SproutPackageException(
+        'The package source is not a complete Sprout app.',
+      );
+    }
+  }
 
   static List<int> _archiveBytes(ArchiveFile file) {
     final content = file.content;

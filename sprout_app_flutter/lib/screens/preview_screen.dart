@@ -70,6 +70,42 @@ class _PreviewScreenState extends State<PreviewScreen> {
         ProjectService().writeAppState(projectName, document.exportState()));
   }
 
+  Future<void> _resetSavedData() async {
+    final projectName = widget.projectName;
+    if (projectName == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset this app’s saved data?'),
+        content: const Text(
+          'This clears entries, forms, and other local data for this project. Your app source and design stay unchanged.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep data'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reset data'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ProjectService().clearAppState(projectName);
+    for (final controller in _inputControllers.values) {
+      controller.dispose();
+    }
+    _inputControllers.clear();
+    await _loadPreview();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved app data was reset.')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     for (final controller in _inputControllers.values) {
@@ -92,6 +128,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 onPressed: _goBack,
               )
             : null,
+        actions: [
+          if (widget.projectName != null)
+            IconButton(
+              icon: const Icon(Icons.restart_alt_rounded),
+              tooltip: 'Reset saved app data',
+              onPressed: _resetSavedData,
+            ),
+        ],
       ),
       body: SafeArea(
         child: _loading

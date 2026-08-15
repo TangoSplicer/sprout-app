@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/project_service.dart';
 import '../services/sprout_language_catalog.dart';
 import 'editor_screen.dart';
+import 'preview_screen.dart';
 
 class ProjectTemplateScreen extends StatefulWidget {
   const ProjectTemplateScreen({super.key});
@@ -175,12 +176,23 @@ class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
       await projects.createProject(projectName);
       await projects.writeFile(projectName, 'main.sprout', code);
       if (!mounted) return;
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => EditorScreen(projectName: projectName),
-        ),
-      );
+      final destination = await _chooseFirstStep(projectName, pattern.name);
+      if (!mounted) return;
+      if (destination == _CreationDestination.run) {
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PreviewScreen(code: code, projectName: projectName),
+          ),
+        );
+      } else {
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EditorScreen(projectName: projectName),
+          ),
+        );
+      }
     } on ProjectException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -197,9 +209,62 @@ class _ProjectTemplateScreenState extends State<ProjectTemplateScreen> {
     }
   }
 
+  Future<_CreationDestination?> _chooseFirstStep(
+    String projectName,
+    String patternName,
+  ) {
+    return showModalBottomSheet<_CreationDestination>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$projectName is ready',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your $patternName starter is saved. You can use it first, then change every part whenever you are ready.',
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () =>
+                      Navigator.pop(context, _CreationDestination.run),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Run my app now'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      Navigator.pop(context, _CreationDestination.edit),
+                  icon: const Icon(Icons.code_rounded),
+                  label: const Text('Inspect and edit source'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
   }
 }
+
+enum _CreationDestination { run, edit }

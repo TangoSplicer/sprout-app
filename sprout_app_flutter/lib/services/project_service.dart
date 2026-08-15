@@ -15,6 +15,7 @@ class ProjectService {
   late Directory _backupsDir;
   bool _initialized = false;
   final ValueNotifier<int> projectChanges = ValueNotifier<int>(0);
+  final Map<String, Future<void>> _stateWriteQueues = {};
 
   @visibleForTesting
   Future<void> useStorageDirectoryForTesting(Directory root) async {
@@ -325,14 +326,29 @@ class ProjectService {
       if (encoded.length > 200000) {
         throw ProjectException('App data is too large to save locally');
       }
-      await _writeJsonAtomically(
-        File('${projectDir.path}/app_state.json'),
-        {
-          'schema_version': 1,
-          'updated_at': DateTime.now().toIso8601String(),
-          'state': state,
-        },
-      );
+
+      // Preview controls can change in quick succession. Queue snapshots for
+      // this project so the newest completed interaction is never replaced by
+      // an earlier atomic write finishing later.
+      final previous = _stateWriteQueues[sanitized] ?? Future<void>.value();
+      final queued = previous.catchError((_) {}).then((_) async {
+        await _writeJsonAtomically(
+          File('${projectDir.path}/app_state.json'),
+          {
+            'schema_version': 1,
+            'updated_at': DateTime.now().toIso8601String(),
+            'state': state,
+          },
+        );
+      });
+      _stateWriteQueues[sanitized] = queued;
+      try {
+        await queued;
+      } finally {
+        if (identical(_stateWriteQueues[sanitized], queued)) {
+          _stateWriteQueues.remove(sanitized);
+        }
+      }
     } catch (error) {
       if (error is ProjectException) rethrow;
       throw ProjectException('Could not save app data: $error');
@@ -541,7 +557,9 @@ class ProjectService {
     File destination,
     Map<String, dynamic> data,
   ) async {
-    final temporary = File('${destination.path}.tmp');
+    final temporary = File(
+      '${destination.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
+    );
     await temporary.writeAsString(jsonEncode(data), flush: true);
     await temporary.rename(destination.path);
   }

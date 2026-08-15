@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sprout_app/services/project_service.dart';
 import 'package:sprout_app/services/sprout_app_package.dart';
@@ -74,13 +77,39 @@ screen Home {
 
   test('rejects packages whose source integrity does not match the manifest',
       () {
-    final bytes = packages.buildPackageBytes(
+    const expectedSource = 'app "Expected" { start = "Home" }';
+    const alteredSource = 'app "Altered" { start = "Home" }';
+    final manifest = SproutPackageManifest(
+      packageId: 'package-integrity-test',
       projectName: 'Validated app',
-      source: source,
+      createdAt: DateTime.utc(2026, 1, 1),
+      includesAppState: false,
+      sourceSha256: sha256.convert(utf8.encode(expectedSource)).toString(),
+      stateSha256: null,
     );
-    final broken = List<int>.from(bytes)..[bytes.length ~/ 2] ^= 0x20;
+    final manifestBytes = utf8.encode(jsonEncode(manifest.toJson()));
+    final alteredSourceBytes = utf8.encode(alteredSource);
+    final archive = Archive()
+      ..addFile(
+          ArchiveFile('manifest.json', manifestBytes.length, manifestBytes))
+      ..addFile(ArchiveFile(
+          'main.sprout', alteredSourceBytes.length, alteredSourceBytes));
+    final bytes = GZipEncoder().encode(TarEncoder().encode(archive))!;
+
     expect(
-      () => packages.inspectBytes(broken),
+      () => packages.inspectBytes(bytes),
+      throwsA(isA<SproutPackageException>()),
+    );
+  });
+
+  test('rejects a hash-valid package whose source is not a Sprout app', () {
+    final bytes = packages.buildPackageBytes(
+      projectName: 'Not an app',
+      source: 'This is ordinary text, not a Sprout document.',
+    );
+
+    expect(
+      () => packages.inspectBytes(bytes),
       throwsA(isA<SproutPackageException>()),
     );
   });
