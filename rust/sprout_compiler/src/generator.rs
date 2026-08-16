@@ -356,6 +356,14 @@ impl CodeGenerator {
                     self.generate_action_code(code, action, indent + 1)?;
                 }
             }
+            Action::Scan { bind_to } => {
+                code.push_str(&format!(
+                    "{:indent$};; Scan -> {}\n",
+                    "",
+                    bind_to,
+                    indent = indent * 4
+                ));
+            }
         }
 
         Ok(())

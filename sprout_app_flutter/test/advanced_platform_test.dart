@@ -191,4 +191,74 @@ void main() {
     expect(effects, isEmpty);
     expect(doc.exportState()['apiResult'], 'Fetched data from https://api.example.com/rates');
   });
+
+  test('SproutPreviewDocument parses and executes if/else logic', () {
+    const source = '''
+app "Logic App" { start = "Main" }
+screen Main {
+  state count = 10
+  state result = ""
+  ui {
+    button "Check" {
+      if count > 5 {
+        result = "High"
+      } else {
+        result = "Low"
+      }
+    }
+  }
+}
+''';
+    final doc = SproutPreviewDocument.parse(source);
+    final button = doc.currentScreen.elements.whereType<SproutPreviewButton>().first;
+    
+    doc.activate(button);
+    expect(doc.inputValue('result'), 'High');
+    
+    doc.updateInput('count', '2');
+    doc.activate(button);
+    expect(doc.inputValue('result'), 'Low');
+  });
+
+  test('SproutPreviewDocument parses and executes loop logic', () {
+    const source = '''
+app "Loop App" { start = "Main" }
+screen Main {
+  state total = 0
+  ui {
+    button "Run" {
+      for i in 1..5 {
+        increment total by 1
+      }
+    }
+  }
+}
+''';
+    final doc = SproutPreviewDocument.parse(source);
+    final button = doc.currentScreen.elements.whereType<SproutPreviewButton>().first;
+    
+    doc.activate(button);
+    expect(doc.metricValue('total'), 5);
+  });
+
+  test('SproutPreviewDocument parses camera and scan elements', () {
+    const source = '''
+app "Lens App" { start = "Main" }
+screen Main {
+  state photo = ""
+  state code = ""
+  ui {
+    camera "Take Photo" -> photo
+    button "Scan" {
+      scan -> code
+    }
+  }
+}
+''';
+    final doc = SproutPreviewDocument.parse(source);
+    expect(doc.currentScreen.elements.any((e) => e is SproutPreviewCamera), true);
+    final button = doc.currentScreen.elements.whereType<SproutPreviewButton>().first;
+    final effects = doc.activate(button);
+    expect(effects.any((e) => e is SproutPreviewScanRequest), true);
+  });
 }

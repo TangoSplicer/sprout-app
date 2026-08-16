@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../services/native_bridge.dart';
+
 import '../services/project_service.dart';
+import '../services/sprout_cloud_service.dart';
 import '../theme/sprout_theme.dart';
 import 'editor_screen.dart';
 import 'gallery_screen.dart';
@@ -133,6 +135,9 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (_) => ShareScreen(projectName: projectName)),
         );
         return;
+      case _ProjectAction.cloudBackup:
+        await _cloudBackup(projectName);
+        return;
       case _ProjectAction.addToHome:
         try {
           final requested = await NativeBridge.requestAppShortcut(projectName);
@@ -157,6 +162,60 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
         return;
+    }
+  }
+
+  Future<void> _cloudBackup(String projectName) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Encrypted Cloud Backup'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'Create a secure, zero-knowledge backup of this app and its data.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Passphrase',
+                hintText: 'Enter a strong passphrase',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Backup')),
+        ],
+      ),
+    );
+
+    if (confirmed == true && controller.text.isNotEmpty) {
+      try {
+        final backup = await SproutCloudService()
+            .createEncryptedBackup(projectName, controller.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Encrypted backup created: ${backup.path}')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Backup failed: $e'),
+                backgroundColor: Colors.redAccent),
+          );
+        }
+      }
     }
   }
 
@@ -356,6 +415,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               PopupMenuItem(
+                                value: _ProjectAction.cloudBackup,
+                                child: ListTile(
+                                  leading: Icon(Icons.cloud_upload_outlined),
+                                  title: Text('Cloud backup'),
+                                ),
+                              ),
+                              PopupMenuItem(
                                 value: _ProjectAction.addToHome,
                                 child: ListTile(
                                   leading:
@@ -397,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-enum _ProjectAction { run, share, addToHome }
+enum _ProjectAction { run, share, cloudBackup, addToHome }
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();

@@ -239,6 +239,29 @@ class SproutPreviewDocument {
     });
   }
 
+  bool _evaluateCondition(String condition) {
+    // Basic condition evaluation for preview
+    if (condition.contains('==')) {
+      final parts = condition.split('==');
+      return _resolveExpression(parts[0].trim()) ==
+          _resolveExpression(parts[1].trim());
+    }
+    if (condition.contains('>')) {
+      final parts = condition.split('>');
+      final left = _asNumber(_resolveExpression(parts[0].trim()));
+      final right = _asNumber(_resolveExpression(parts[1].trim()));
+      return left > right;
+    }
+    if (condition.contains('<')) {
+      final parts = condition.split('<');
+      final left = _asNumber(_resolveExpression(parts[0].trim()));
+      final right = _asNumber(_resolveExpression(parts[1].trim()));
+      return left < right;
+    }
+    final val = _resolveExpression(condition);
+    return val == 'true';
+  }
+
   SproutPreviewEffect? _runAction(SproutPreviewAction action) {
     switch (action) {
       case SproutPreviewNavigate(:final target):
@@ -293,6 +316,32 @@ class SproutPreviewDocument {
       case SproutPreviewFetch(:final url, :final bindTo):
         _state[bindTo] = 'Fetched data from $url';
         return null;
+      case SproutPreviewScan(:final bindTo):
+        return SproutPreviewScanRequest(bindTo);
+      case SproutPreviewIf(:final condition, :final thenActions, :final elseActions):
+        if (_evaluateCondition(condition)) {
+          for (final a in thenActions) {
+            _runAction(a);
+          }
+        } else if (elseActions != null) {
+          for (final a in elseActions) {
+            _runAction(a);
+          }
+        }
+        return null;
+      case SproutPreviewLoop(:final variable, :final range, :final body):
+        final parts = range.split('..');
+        if (parts.length == 2) {
+          final start = int.tryParse(parts[0]) ?? 0;
+          final end = int.tryParse(parts[1]) ?? 0;
+          for (var i = start; i <= end && i < start + 100; i++) {
+            _state[variable] = i;
+            for (final a in body) {
+              _runAction(a);
+            }
+          }
+        }
+        return null;
       case SproutPreviewScheduleReminder(:final message, :final time):
         return SproutPreviewReminderRequest(
           message: _resolveExpression(message),
@@ -319,7 +368,7 @@ class SproutPreviewDocument {
     Map<String, Object?> state,
   ) {
     final stateRegex = RegExp(
-      r'^\s*state\s+(\w+)\s*:\s*(.+?)\s*$',
+      r'^\s*state\s+(\w+)\s*(?::|=)\s*(.+?)\s*$',
       multiLine: true,
     );
     for (final match in stateRegex.allMatches(body)) {
@@ -372,6 +421,7 @@ class SproutPreviewDocument {
     final toggle = RegExp(r'^toggle\s+"([^"]+)"\s*->\s*(\w+)$');
     final chart = RegExp(r'^chart\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+by\s+(\w+)$');
     final audio = RegExp(r'^audio\s+"([^"]+)"\s*->\s*(\w+)$');
+    final camera = RegExp(r'^camera\s+"([^"]+)"\s*->\s*(\w+)$');
     final button = RegExp(r'^button\s+"([^"]+)"\s*(.*)$');
     final legacyButton = RegExp(r'^button\("([^"]+)"\)$');
 
@@ -533,6 +583,14 @@ class SproutPreviewDocument {
         ));
         continue;
       }
+      final cameraMatch = camera.firstMatch(line);
+      if (cameraMatch != null) {
+        elements.add(SproutPreviewCamera(
+          label: cameraMatch.group(1)!,
+          binding: cameraMatch.group(2)!,
+        ));
+        continue;
+      }
       if (line == 'divider') {
         elements.add(const SproutPreviewDivider());
         continue;
@@ -576,6 +634,11 @@ class SproutPreviewDocument {
 
   static List<SproutPreviewAction> _parseActions(String source) {
     final actions = <SproutPreviewAction>[];
+    
+    // Handle nested blocks first
+    final ifRegex = RegExp(r'^if\s+(.+?)\s*\{');
+    final loopRegex = RegExp(r'^for\s+(\w+)\s+in\s+(.+?)\s*\{');
+
     final append = RegExp(r'^(\w+)\.append\((.+)\)$');
     final record = RegExp(r'^(\w+)\.add\((.+)\)$');
     final remove = RegExp(r'^(\w+)\.remove\((.+)\)$');
@@ -584,12 +647,131 @@ class SproutPreviewDocument {
     final increment = RegExp(r'^increment\s+(\w+)(?:\s+by\s+(-?\d+))?$');
     final clear = RegExp(r'^clear\s+(\w+)$');
     final fetch = RegExp(r'^fetch\s+"([^"]+)"\s*->\s*(\w+)$');
+    final scan = RegExp(r'^scan\s*->\s*(\w+)$');
     final assignment = RegExp(r'^(\w+)\s*=\s*(.+)$');
     final navigate = RegExp(r'^(?:go|navigate)\s+(\w+)$');
 
-    for (final statement in source.split(RegExp(r'[\n;]'))) {
-      final value = statement.trim();
+    final lines = source.split(RegExp(r'[\n;]'));
+
+    var index = 0;
+    while (index < lines.length) {
+      final value = lines[index].trim();
+      index++;
       if (value.isEmpty || value.startsWith('//')) continue;
+
+      final ifMatch = ifRegex.firstMatch(value);
+      if (ifMatch != null) {
+        final condition = ifMatch.group(1)!.trim();
+        var blockSource = '';
+        var depth = 1;
+        
+        final remainder = value.substring(ifMatch.end).trim();
+        if (remainder.isNotEmpty) {
+          blockSource = remainder;
+          depth += _braceDelta(remainder);
+        }
+
+        List<SproutPreviewAction>? elseActions;
+        while (depth > 0 && index < lines.length) {
+          final next = lines[index++].trim();
+          if (next.isEmpty || next.startsWith('//')) continue;
+          
+          if (depth == 1 && next.contains('else') && next.contains('}')) {
+            final closingIdx = next.indexOf('}');
+            final ifPart = next.substring(0, closingIdx).trim();
+            if (ifPart.isNotEmpty) {
+              blockSource = blockSource.isEmpty ? ifPart : '$blockSource\n$ifPart';
+            }
+            
+            var elseSource = next.substring(closingIdx + 1).trim();
+            var elseDepth = 1;
+            final elseRemainder = elseSource.contains('{') ? elseSource.substring(elseSource.indexOf('{') + 1).trim() : elseSource;
+            elseSource = elseRemainder;
+            if (elseSource.isNotEmpty) {
+              elseDepth += _braceDelta(elseSource);
+            }
+
+            while (elseDepth > 0 && index < lines.length) {
+              final subNext = lines[index++].trim();
+              if (subNext.isEmpty || subNext.startsWith('//')) continue;
+
+              final delta = _braceDelta(subNext);
+              if (elseDepth == 1 && (delta < 0 || subNext.startsWith('}'))) {
+                break;
+              }
+              elseDepth += delta;
+              elseSource = elseSource.isEmpty ? subNext : '$elseSource\n$subNext';
+            }
+            elseActions = _parseActions(elseSource);
+            break;
+          }
+          
+          final delta = _braceDelta(next);
+          if (depth == 1 && (delta < 0 || next.startsWith('}'))) {
+            break;
+          }
+          depth += delta;
+          blockSource = blockSource.isEmpty ? next : '$blockSource\n$next';
+        }
+        
+        final thenActions = _parseActions(blockSource);
+
+        if (elseActions == null && index < lines.length) {
+          var peekIndex = index;
+          while (peekIndex < lines.length && lines[peekIndex].trim().isEmpty) {
+            peekIndex++;
+          }
+          if (peekIndex < lines.length) {
+            final peekLine = lines[peekIndex].trim();
+            if (peekLine.startsWith('else') || peekLine.contains('else')) {
+              index = peekIndex + 1;
+              var elseSource = '';
+              var elseDepth = 1;
+              
+              final elseRemainder = peekLine.contains('{') ? peekLine.substring(peekLine.indexOf('{') + 1).trim() : '';
+              if (elseRemainder.isNotEmpty) {
+                elseSource = elseRemainder;
+                elseDepth += _braceDelta(elseRemainder);
+              }
+
+              while (elseDepth > 0 && index < lines.length) {
+                final subNext = lines[index++].trim();
+                if (subNext.isEmpty || subNext.startsWith('//')) continue;
+
+                final delta = _braceDelta(subNext);
+                if (elseDepth == 1 && (delta < 0 || subNext.startsWith('}'))) {
+                  break;
+                }
+                elseDepth += delta;
+                elseSource = elseSource.isEmpty ? subNext : '$elseSource\n$subNext';
+              }
+              elseActions = _parseActions(elseSource);
+            }
+          }
+        }
+
+        actions.add(SproutPreviewIf(condition, thenActions, elseActions));
+        continue;
+      }
+
+      final loopMatch = loopRegex.firstMatch(value);
+      if (loopMatch != null) {
+        final variable = loopMatch.group(1)!;
+        final range = loopMatch.group(2)!;
+        var blockSource = value.substring(loopMatch.end);
+        var depth = _braceDelta(value);
+        while (depth > 0 && index < lines.length) {
+          final next = lines[index++];
+          depth += _braceDelta(next);
+          blockSource = '$blockSource\n$next';
+        }
+        final closing = blockSource.lastIndexOf('}');
+        if (closing >= 0) blockSource = blockSource.substring(0, closing);
+        
+        actions.add(SproutPreviewLoop(variable, range, _parseActions(blockSource)));
+        continue;
+      }
+
       final recordMatch = record.firstMatch(value);
       if (recordMatch != null) {
         final fields = <String, String>{};
@@ -636,6 +818,9 @@ class SproutPreviewDocument {
       } else if (fetch.firstMatch(value) != null) {
         final match = fetch.firstMatch(value)!;
         actions.add(SproutPreviewFetch(match.group(1)!, match.group(2)!));
+      } else if (scan.firstMatch(value) != null) {
+        final match = scan.firstMatch(value)!;
+        actions.add(SproutPreviewScan(match.group(1)!));
       } else if (navigateMatch != null) {
         actions.add(SproutPreviewNavigate(navigateMatch.group(1)!));
       } else if (assignmentMatch != null) {
@@ -871,6 +1056,16 @@ class SproutPreviewAudioPlayer extends SproutPreviewElement {
   });
 }
 
+class SproutPreviewCamera extends SproutPreviewElement {
+  final String label;
+  final String binding;
+
+  const SproutPreviewCamera({
+    required this.label,
+    required this.binding,
+  });
+}
+
 class SproutPreviewDivider extends SproutPreviewElement {
   const SproutPreviewDivider();
 }
@@ -953,6 +1148,28 @@ class SproutPreviewFetch extends SproutPreviewAction {
   const SproutPreviewFetch(this.url, this.bindTo);
 }
 
+class SproutPreviewScan extends SproutPreviewAction {
+  final String bindTo;
+
+  const SproutPreviewScan(this.bindTo);
+}
+
+class SproutPreviewIf extends SproutPreviewAction {
+  final String condition;
+  final List<SproutPreviewAction> thenActions;
+  final List<SproutPreviewAction>? elseActions;
+
+  const SproutPreviewIf(this.condition, this.thenActions, [this.elseActions]);
+}
+
+class SproutPreviewLoop extends SproutPreviewAction {
+  final String variable;
+  final String range;
+  final List<SproutPreviewAction> body;
+
+  const SproutPreviewLoop(this.variable, this.range, this.body);
+}
+
 sealed class SproutPreviewEffect {
   const SproutPreviewEffect();
 }
@@ -963,6 +1180,18 @@ class SproutPreviewReminderRequest extends SproutPreviewEffect {
 
   const SproutPreviewReminderRequest(
       {required this.message, required this.time});
+}
+
+class SproutPreviewScanRequest extends SproutPreviewEffect {
+  final String binding;
+
+  const SproutPreviewScanRequest(this.binding);
+}
+
+class SproutPreviewPhotoRequest extends SproutPreviewEffect {
+  final String binding;
+
+  const SproutPreviewPhotoRequest(this.binding);
 }
 
 class _NamedBlock {

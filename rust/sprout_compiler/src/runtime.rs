@@ -292,6 +292,12 @@ impl WasmRuntime {
             UiElement::AudioPlayer { label, source } => {
                 self.track_memory_usage(label.len() + source.len());
             }
+            UiElement::Camera { label, bind_to } => {
+                self.track_memory_usage(label.len());
+                if !self.state.contains_key(bind_to) {
+                    self.update_state(bind_to, ValueType::String(String::new()))?;
+                }
+            }
         }
 
         Ok(())
@@ -507,6 +513,13 @@ impl WasmRuntime {
                         self.execute_action(action)?;
                     }
                 }
+            }
+            Action::Scan { bind_to } => {
+                self.log_event(ExecutionEvent::ActionExecuted(format!(
+                    "Scanning QR code -> {}",
+                    bind_to
+                )));
+                self.update_state(bind_to, ValueType::String("Scanned data".to_string()))?;
             }
         }
 

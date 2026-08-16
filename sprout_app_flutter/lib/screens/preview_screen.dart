@@ -471,6 +471,51 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ),
           ),
         ),
+      SproutPreviewCamera(:final label, :final binding) => Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                      child: Icon(Icons.camera_alt_rounded, color: Theme.of(context).colorScheme.primary),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            document.resolveTemplate(label),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            document.resolveTemplate(binding).isEmpty ? 'No photo captured yet' : 'Captured: ${document.resolveTemplate(binding)}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _handlePhoto(SproutPreviewPhotoRequest(binding)),
+                    icon: const Icon(Icons.camera_rounded),
+                    label: const Text('Capture Photo'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       SproutPreviewButton(:final label) => Padding(
           padding: const EdgeInsets.only(top: 8),
           child: FilledButton(
@@ -889,7 +934,33 @@ class _PreviewScreenState extends State<PreviewScreen> {
     for (final effect in effects) {
       if (effect is SproutPreviewReminderRequest) {
         await _scheduleReminder(effect);
+      } else if (effect is SproutPreviewScanRequest) {
+        await _handleScan(effect);
+      } else if (effect is SproutPreviewPhotoRequest) {
+        await _handlePhoto(effect);
       }
+    }
+  }
+
+  Future<void> _handleScan(SproutPreviewScanRequest request) async {
+    final result = await NativeBridge.scanQrCode();
+    if (result != null && mounted) {
+      setState(() {
+        _document!.updateInput(request.binding, result);
+        _controllerFor(request.binding).text = result;
+      });
+      _persistState();
+    }
+  }
+
+  Future<void> _handlePhoto(SproutPreviewPhotoRequest request) async {
+    final result = await NativeBridge.takePhoto();
+    if (result != null && mounted) {
+      setState(() {
+        _document!.updateInput(request.binding, result);
+        _controllerFor(request.binding).text = result;
+      });
+      _persistState();
     }
   }
 

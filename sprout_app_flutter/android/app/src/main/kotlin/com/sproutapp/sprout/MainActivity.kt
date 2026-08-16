@@ -173,6 +173,14 @@ class MainActivity: FlutterFragmentActivity() {
                         result.error("INVALID_ARGUMENT", "Valid message required", null)
                     }
                 }
+                "takePhoto" -> {
+                    // Mock photo capture for test builds
+                    result.success("photo_captured_${System.currentTimeMillis()}.jpg")
+                }
+                "scanQrCode" -> {
+                    // Mock QR scan for test builds
+                    result.success("SPROUT_SCANNED_DATA_001")
+                }
                 else -> result.notImplemented()
             }
         }

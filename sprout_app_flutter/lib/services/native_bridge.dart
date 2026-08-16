@@ -24,8 +24,9 @@ class NativeBridge {
     });
   }
 
-  static Future<void> takePhoto() async {
-    await _channel.invokeMethod('takePhoto');
+  static Future<String?> takePhoto() async {
+    final result = await _channel.invokeMethod<String?>('takePhoto');
+    return result ?? 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
   }
 
   static Future<String?> scanQrCode() async {

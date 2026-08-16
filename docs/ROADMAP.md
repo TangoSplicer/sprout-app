@@ -1,6 +1,6 @@
 # Sprout Platform Roadmap & Capabilities
 
-Sprout helps people turn small, personal needs into useful tools from their phone. This roadmap documents the core platform capabilities available today.
+Sprout helps people turn small, personal needs into useful tools from their phone. This roadmap documents the core platform capabilities available today and the next-generation pillars planned for development.
 
 ## Current Production Foundation
 
@@ -17,6 +17,13 @@ Sprout is a fully realized local-first application platform featuring a Rust com
 | **Sprout Connect (P2P Sync)** | Local-network data synchronization for collaborative apps with explicit user consent. |
 | **Media & Insights** | Native charts (`bar`, `line`, `pie`), audio players, and safe web `fetch` actions with domain confirmation. |
 | **Interactive Preview** | Real-time runtime supporting state, inputs, choices, searchable editable records, breakdowns, and aggregates. |
+
+## Next-Generation Roadmap Pillars
+
+1. **Logic Power (`if/else` & Expressions)**: Extending SproutScript actions with conditional branching so apps can react dynamically to state values (e.g., triggering alerts or navigation based on thresholds).
+2. **Sprout Lens (Camera & Scanning)**: Integrating device camera capture and QR/barcode scanning directly into Sprout apps for physical tracking and receipt management.
+3. **Sprout Cloud (End-to-End Encrypted Backup)**: Optional, zero-knowledge encrypted cloud backups and multi-device synchronization for user projects and app state.
+4. **Theme Studio & Accessibility**: Granular visual customization of colors, typography, and card layouts in the visual builder, paired with full accessibility support.
 
 ## Product Principles
 

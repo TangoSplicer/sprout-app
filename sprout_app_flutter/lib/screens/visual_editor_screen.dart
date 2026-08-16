@@ -147,11 +147,19 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
         case _ComponentType.chart:
           buffer.writeln('      chart "${c.label}" items amount by bar');
           break;
-        case _ComponentType.audio:
-          buffer.writeln('      audio "${c.label}" -> ${c.binding}');
-          break;
-      }
+      case _ComponentType.audio:
+        buffer.writeln('      audio "${c.label}" -> ${c.binding}');
+        break;
+      case _ComponentType.camera:
+        buffer.writeln('      camera "${c.label}" -> ${c.binding}');
+        break;
+      case _ComponentType.scan:
+        buffer.writeln('      button "${c.label}" {');
+        buffer.writeln('        scan -> ${c.binding}');
+        buffer.writeln('      }');
+        break;
     }
+  }
 
     buffer.writeln('    }');
     buffer.writeln('  }');
@@ -191,6 +199,12 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
           break;
         case _ComponentType.audio:
           _components.add(const _VisualComponent(type: _ComponentType.audio, label: 'Voice Note', binding: 'voiceNote'));
+          break;
+        case _ComponentType.camera:
+          _components.add(const _VisualComponent(type: _ComponentType.camera, label: 'Take Photo', binding: 'photoPath'));
+          break;
+        case _ComponentType.scan:
+          _components.add(const _VisualComponent(type: _ComponentType.scan, label: 'Scan QR Code', binding: 'scannedData'));
           break;
       }
     });
@@ -342,6 +356,18 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                       label: const Text('Audio'),
                       onPressed: () => _addComponent(_ComponentType.audio),
                     ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.camera_alt_rounded, size: 16),
+                      label: const Text('Camera'),
+                      onPressed: () => _addComponent(_ComponentType.camera),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                      label: const Text('Scan'),
+                      onPressed: () => _addComponent(_ComponentType.scan),
+                    ),
                   ],
                 ),
               ),
@@ -374,11 +400,15 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
         return Icons.bar_chart_rounded;
       case _ComponentType.audio:
         return Icons.audiotrack_rounded;
+      case _ComponentType.camera:
+        return Icons.camera_alt_rounded;
+      case _ComponentType.scan:
+        return Icons.qr_code_scanner_rounded;
     }
   }
 }
 
-enum _ComponentType { label, input, number, metric, list, button, sync, notify, chart, audio }
+enum _ComponentType { label, input, number, metric, list, button, sync, notify, chart, audio, camera, scan }
 
 class _VisualComponent {
   final _ComponentType type;

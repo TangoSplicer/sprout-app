@@ -8,6 +8,7 @@ import '../widgets/debug_console.dart';
 import '../widgets/syntax_editor.dart';
 import 'language_tools_screen.dart';
 import 'preview_screen.dart';
+import '../services/sprout_cloud_service.dart';
 import 'share_screen.dart';
 import 'version_history_screen.dart';
 import 'visual_editor_screen.dart';
@@ -122,6 +123,63 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  Future<void> _cloudBackup() async {
+    final saved = await _save(announce: false);
+    if (!saved || !mounted) return;
+
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Encrypted Cloud Backup'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+                'Create a secure, zero-knowledge backup of this app and its data.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Passphrase',
+                hintText: 'Enter a strong passphrase',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Backup')),
+        ],
+      ),
+    );
+
+    if (confirmed == true && controller.text.isNotEmpty) {
+      try {
+        final backup = await SproutCloudService()
+            .createEncryptedBackup(widget.projectName, controller.text);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Encrypted backup created: ${backup.path}')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Backup failed: $e'),
+                backgroundColor: Colors.redAccent),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
@@ -191,6 +249,11 @@ class _EditorScreenState extends State<EditorScreen> {
                 _showMessage('Restored project version.');
               }
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.cloud_upload_outlined),
+            tooltip: 'Cloud backup',
+            onPressed: _cloudBackup,
           ),
           IconButton(
             icon: const Icon(Icons.share_outlined),

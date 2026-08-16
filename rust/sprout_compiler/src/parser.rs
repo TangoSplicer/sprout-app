@@ -135,6 +135,11 @@ impl Parser {
             Regex::new(r#"^metric\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
         let toggle_regex =
             Regex::new(r#"^toggle\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
+        let chart_regex = Regex::new(r#"^chart\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+by\s+(\w+)$"#)
+            .expect("static regex");
+        let audio_regex = Regex::new(r#"^audio\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
+        let camera_regex =
+            Regex::new(r#"^camera\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
         let button_regex = Regex::new(r#"^button\s+"([^"]+)"\s*(.*)$"#).expect("static regex");
         let legacy_button_regex = Regex::new(r#"^button\("([^"]+)"\)$"#).expect("static regex");
 
@@ -388,6 +393,32 @@ impl Parser {
                 continue;
             }
 
+            if let Some(capture) = chart_regex.captures(line) {
+                elements.push(UiElement::Chart {
+                    title: capture.get(1).unwrap().as_str().to_string(),
+                    collection: capture.get(2).unwrap().as_str().to_string(),
+                    amount_field: capture.get(3).unwrap().as_str().to_string(),
+                    chart_type: capture.get(4).unwrap().as_str().to_string(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = audio_regex.captures(line) {
+                elements.push(UiElement::AudioPlayer {
+                    label: capture.get(1).unwrap().as_str().to_string(),
+                    source: capture.get(2).unwrap().as_str().to_string(),
+                });
+                continue;
+            }
+
+            if let Some(capture) = camera_regex.captures(line) {
+                elements.push(UiElement::Camera {
+                    label: capture.get(1).unwrap().as_str().to_string(),
+                    bind_to: capture.get(2).unwrap().as_str().to_string(),
+                });
+                continue;
+            }
+
             if line == "divider" {
                 elements.push(UiElement::Divider);
                 continue;
@@ -454,6 +485,60 @@ impl Parser {
     }
 
     fn parse_action_block(&self, source: &str) -> Result<Action> {
+        // Handle nested block parsing first
+        let if_regex = Regex::new(r"(?m)^if\s+(.+?)\s*\{").expect("static regex");
+        let loop_regex = Regex::new(r"(?m)^for\s+(\w+)\s+in\s+(.+?)\s*\{").expect("static regex");
+
+        if let Some(capture) = if_regex.captures(source) {
+            let condition = capture.get(1).unwrap().as_str().trim().to_string();
+            let start_idx = capture.get(0).unwrap().end() - 1;
+            if let Some(end_idx) = matching_brace(source, start_idx) {
+                let then_body = &source[start_idx + 1..end_idx];
+                let then_action = self.parse_action_block(then_body)?;
+
+                let remainder = &source[end_idx + 1..];
+                let else_action = if let Some(else_match) = Regex::new(r"^\s*else\s*\{")
+                    .expect("static regex")
+                    .find(remainder)
+                {
+                    let else_start = end_idx + 1 + else_match.end() - 1;
+                    if let Some(else_end) = matching_brace(source, else_start) {
+                        let else_body = &source[else_start + 1..else_end];
+                        Some(Box::new(self.parse_action_block(else_body)?))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                return Ok(Action::If {
+                    condition,
+                    then: Box::new(then_action),
+                    r#else: else_action,
+                });
+            }
+        }
+
+        if let Some(capture) = loop_regex.captures(source) {
+            let variable = capture.get(1).unwrap().as_str().trim().to_string();
+            let range = capture.get(2).unwrap().as_str().trim().to_string();
+            let start_idx = capture.get(0).unwrap().end() - 1;
+            if let Some(end_idx) = matching_brace(source, start_idx) {
+                let loop_body = &source[start_idx + 1..end_idx];
+                let body_action = self.parse_action_block(loop_body)?;
+                let body = match body_action {
+                    Action::Sequence { actions } => actions,
+                    action => vec![action],
+                };
+                return Ok(Action::Loop {
+                    variable,
+                    range,
+                    body,
+                });
+            }
+        }
+
         let append_regex = Regex::new(r"^(\w+)\.append\((.+)\)$").expect("static regex");
         let record_regex = Regex::new(r"^(\w+)\.add\((.+)\)$").expect("static regex");
         let remove_regex = Regex::new(r"^(\w+)\.remove\((.+)\)$").expect("static regex");

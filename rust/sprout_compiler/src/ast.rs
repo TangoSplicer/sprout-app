@@ -127,6 +127,10 @@ pub enum UiElement {
         label: String,
         source: String,
     },
+    Camera {
+        label: String,
+        bind_to: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -209,6 +213,9 @@ pub enum Action {
         variable: String,
         range: String,
         body: Vec<Action>,
+    },
+    Scan {
+        bind_to: String,
     },
 }
 
@@ -544,6 +551,12 @@ impl UiElement {
                     return Err("Audio player declaration is invalid".to_string());
                 }
             }
+            UiElement::Camera { label, bind_to } => {
+                if label.is_empty() || label.len() > 120 || bind_to.is_empty() || bind_to.len() > 50
+                {
+                    return Err("Camera declaration is invalid".to_string());
+                }
+            }
         }
 
         Ok(())
@@ -609,6 +622,11 @@ impl Action {
             Action::Fetch { url, bind_to } => {
                 if url.is_empty() || url.len() > 500 || bind_to.is_empty() || bind_to.len() > 50 {
                     return Err("Fetch action is invalid".to_string());
+                }
+            }
+            Action::Scan { bind_to } => {
+                if bind_to.is_empty() || bind_to.len() > 50 {
+                    return Err("Scan action is invalid".to_string());
                 }
             }
             Action::ScheduleReminder { message, time } => {
