@@ -94,7 +94,7 @@ screen Home {
           ArchiveFile('manifest.json', manifestBytes.length, manifestBytes))
       ..addFile(ArchiveFile(
           'main.sprout', alteredSourceBytes.length, alteredSourceBytes));
-    final bytes = GZipEncoder().encode(TarEncoder().encode(archive))!;
+    final bytes = GZipEncoder().encode(TarEncoder().encode(archive));
 
     expect(
       () => packages.inspectBytes(bytes),

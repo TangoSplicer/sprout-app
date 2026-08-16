@@ -106,7 +106,7 @@ class SproutAppPackageService {
     }
     final tar = TarEncoder().encode(archive);
     final compressed = GZipEncoder().encode(tar);
-    if (compressed == null || compressed.length > maxPackageBytes) {
+    if (compressed.length > maxPackageBytes) {
       throw const SproutPackageException(
           'The complete app package is too large to share.');
     }
@@ -260,10 +260,7 @@ class SproutAppPackageService {
   }
 
   static List<int> _archiveBytes(ArchiveFile file) {
-    final content = file.content;
-    if (content is List<int>) return content;
-    throw const SproutPackageException(
-        'A package entry has an invalid binary format.');
+    return file.content as List<int>;
   }
 
   static Map<String, dynamic> _decodeJsonFile(ArchiveFile file) {

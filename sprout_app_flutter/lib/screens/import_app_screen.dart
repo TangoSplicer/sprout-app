@@ -37,13 +37,14 @@ class _ImportAppScreenState extends State<ImportAppScreen> {
   }
 
   Future<void> _chooseFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['sproutapp'],
-      withData: false,
     );
-    final path = result?.files.singleOrNull?.path;
-    if (path != null) await _inspect(File(path));
+    if (result != null && result.files.isNotEmpty) {
+      final path = result.files.first.path;
+      if (path != null) await _inspect(File(path));
+    }
   }
 
   Future<void> _inspect(File file) async {
