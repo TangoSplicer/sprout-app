@@ -7,8 +7,22 @@ use std::collections::HashMap;
 pub struct App {
     pub name: String,
     pub start_screen: String,
+    pub theme: String,
     pub screens: Vec<Screen>,
     pub state: Vec<StateVariable>,
+    pub models: Vec<DataModel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataModel {
+    pub name: String,
+    pub fields: Vec<DataModelField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataModelField {
+    pub name: String,
+    pub type_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -233,6 +247,7 @@ impl App {
     pub const MAX_SCREENS: usize = 50;
     pub const MAX_STATE_VARS: usize = 200;
     pub const MAX_UI_ELEMENTS_PER_SCREEN: usize = 100;
+    pub const MAX_MODELS: usize = 100;
 }
 
 impl Screen {
@@ -261,6 +276,17 @@ impl App {
             return Err("App name contains dangerous patterns".to_string());
         }
 
+        // Validate data models before screens so schema errors are reported clearly.
+        if self.models.len() > Self::MAX_MODELS {
+            return Err(format!(
+                "Too many data models. Maximum is {}",
+                Self::MAX_MODELS
+            ));
+        }
+        for model in &self.models {
+            model.validate()?;
+        }
+
         // Validate screens
         if self.screens.len() > Self::MAX_SCREENS {
             return Err(format!(
@@ -283,6 +309,42 @@ impl App {
             ));
         }
 
+        Ok(())
+    }
+}
+
+impl DataModel {
+    pub const MAX_NAME_LENGTH: usize = 50;
+    pub const MAX_FIELDS: usize = 32;
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.is_empty() || self.name.len() > Self::MAX_NAME_LENGTH {
+            return Err(format!(
+                "Data model name must be 1-{} characters",
+                Self::MAX_NAME_LENGTH
+            ));
+        }
+        if self.name.contains("eval") || self.name.contains("exec") {
+            return Err("Data model name contains dangerous patterns".to_string());
+        }
+        if self.fields.len() > Self::MAX_FIELDS {
+            return Err(format!(
+                "Too many fields in data model {}. Maximum is {}",
+                self.name,
+                Self::MAX_FIELDS
+            ));
+        }
+        for field in &self.fields {
+            if field.name.is_empty() || field.name.len() > StateVariable::MAX_NAME_LENGTH {
+                return Err(format!("Invalid field name in data model {}", self.name));
+            }
+            if field.type_name.is_empty() || field.type_name.len() > 50 {
+                return Err(format!(
+                    "Invalid field type for {}.{}",
+                    self.name, field.name
+                ));
+            }
+        }
         Ok(())
     }
 }

@@ -10,12 +10,35 @@ abstract final class SproutTheme {
   static const gold = Color(0xFFE9AE43);
   static const sage = Color(0xFFBFD8BC);
 
-  static ThemeData light() {
+  static ThemeData light({String preset = 'Forest'}) {
+    Color primary = forest;
+    Color secondary = clay;
+    Color bg = cream;
+
+    switch (preset) {
+      case 'Ocean':
+        primary = const Color(0xFF005B96);
+        secondary = const Color(0xFFFF6F61);
+        bg = const Color(0xFFF0F8FF);
+      case 'Sunset':
+        primary = const Color(0xFF6A0572);
+        secondary = const Color(0xFFFFA45B);
+        bg = const Color(0xFFFFF5F5);
+      case 'Minimal':
+        primary = ink;
+        secondary = sage;
+        bg = Colors.white;
+      default:
+        primary = forest;
+        secondary = clay;
+        bg = cream;
+    }
+
     final scheme = ColorScheme.fromSeed(
-      seedColor: forest,
+      seedColor: primary,
       brightness: Brightness.light,
-      primary: forest,
-      secondary: clay,
+      primary: primary,
+      secondary: secondary,
       surface: paper,
       error: const Color(0xFFB3261E),
     );
@@ -25,10 +48,10 @@ abstract final class SproutTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: cream,
+      scaffoldBackgroundColor: bg,
       fontFamily: 'Roboto',
-      appBarTheme: const AppBarTheme(
-        backgroundColor: cream,
+      appBarTheme: AppBarTheme(
+        backgroundColor: bg,
         foregroundColor: ink,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -69,7 +92,7 @@ abstract final class SproutTheme {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 52),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          foregroundColor: forest,
+          foregroundColor: primary,
           shape: softShape,
           side: BorderSide(color: scheme.outlineVariant, width: 1.2),
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
@@ -90,7 +113,7 @@ abstract final class SproutTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: forest, width: 2),
+          borderSide: BorderSide(color: primary, width: 2),
         ),
       ),
       bottomAppBarTheme: const BottomAppBarTheme(

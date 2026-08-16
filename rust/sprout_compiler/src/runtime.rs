@@ -760,12 +760,14 @@ mod tests {
         App {
             name: "Test".to_string(),
             start_screen: "Home".to_string(),
+            theme: "Forest".to_string(),
             screens: vec![Screen {
                 name: "Home".to_string(),
                 state: vec![],
                 ui,
             }],
             state: vec![],
+            models: vec![],
         }
     }
 
@@ -803,6 +805,7 @@ mod tests {
         let app = App {
             name: "Todo".to_string(),
             start_screen: "Todo".to_string(),
+            theme: "Forest".to_string(),
             state: vec![],
             screens: vec![
                 Screen {
@@ -825,6 +828,7 @@ mod tests {
                     ui: vec![],
                 },
             ],
+            models: vec![],
         };
         let mut runtime = WasmRuntime::new(RuntimeOptions::default());
         runtime.execute(&app, "Todo").expect("app starts");

@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/native_bridge.dart';
 import '../services/project_service.dart';
 import '../services/sprout_preview_document.dart';
+import '../theme/sprout_theme.dart';
 import '../widgets/preview_container.dart';
 
 class PreviewScreen extends StatefulWidget {
@@ -114,35 +115,40 @@ class _PreviewScreenState extends State<PreviewScreen> {
     super.dispose();
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     final document = _document;
+    final theme = SproutTheme.light(preset: document?.theme ?? 'Forest');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(document?.appName ?? 'Preview'),
-        leading: document != null && document.screenName != document.startScreen
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                tooltip: 'Back',
-                onPressed: _goBack,
-              )
-            : null,
-        actions: [
-          if (widget.projectName != null)
-            IconButton(
-              icon: const Icon(Icons.restart_alt_rounded),
-              tooltip: 'Reset saved app data',
-              onPressed: _resetSavedData,
-            ),
-        ],
-      ),
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? _buildErrorState()
-                : _buildPreview(document!),
+    return Theme(
+      data: theme,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(document?.appName ?? 'Preview'),
+          leading:
+              document != null && document.screenName != document.startScreen
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Back',
+                      onPressed: _goBack,
+                    )
+                  : null,
+          actions: [
+            if (widget.projectName != null)
+              IconButton(
+                icon: const Icon(Icons.restart_alt_rounded),
+                tooltip: 'Reset saved app data',
+                onPressed: _resetSavedData,
+              ),
+          ],
+        ),
+        body: SafeArea(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? _buildErrorState()
+                  : _buildPreview(document!),
+        ),
       ),
     );
   }

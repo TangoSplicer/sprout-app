@@ -7,6 +7,7 @@
 class SproutPreviewDocument {
   final String appName;
   final String startScreen;
+  final String theme;
   final Map<String, SproutPreviewScreen> _screens;
   final Map<String, Object?> _state;
   final List<String> _navigationStack;
@@ -14,6 +15,7 @@ class SproutPreviewDocument {
   SproutPreviewDocument._({
     required this.appName,
     required this.startScreen,
+    required this.theme,
     required Map<String, SproutPreviewScreen> screens,
     required Map<String, Object?> state,
   })  : _screens = screens,
@@ -23,6 +25,11 @@ class SproutPreviewDocument {
   factory SproutPreviewDocument.parse(String source) {
     final appName = RegExp(r'app\s+"([^"]+)"').firstMatch(source)?.group(1) ??
         'Untitled Sprout App';
+    final theme = RegExp(
+          r'^\s*theme\s*=\s*"([^"]+)"\s*$',
+          multiLine: true,
+        ).firstMatch(source)?.group(1) ??
+        'Forest';
     final screenBlocks = _extractNamedBlocks(source, 'screen');
     final screens = <String, SproutPreviewScreen>{};
     final state = <String, Object?>{};
@@ -50,6 +57,7 @@ class SproutPreviewDocument {
     return SproutPreviewDocument._(
       appName: appName,
       startScreen: startScreen,
+      theme: theme,
       screens: screens,
       state: state,
     );

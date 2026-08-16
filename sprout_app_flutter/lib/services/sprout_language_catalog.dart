@@ -172,6 +172,12 @@ screen Guide {
   start = "Dashboard"
 }
 
+data Transaction {
+  kind: String
+  label: String
+  amount: Number
+}
+
 screen Dashboard {
   state transactions: []
   ui {

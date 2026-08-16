@@ -450,8 +450,10 @@ mod tests {
         let app = App {
             name: "Test".to_string(),
             start_screen: "Home".to_string(),
+            theme: "Forest".to_string(),
             screens: vec![],
             state: vec![],
+            models: vec![],
         };
 
         let options = GeneratorOptions::default();

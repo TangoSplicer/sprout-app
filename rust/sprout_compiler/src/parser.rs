@@ -18,7 +18,39 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<App> {
-        let (name, declared_start) = self.parse_app_declaration()?;
+        let (name, declared_start, theme) = self.parse_app_declaration()?;
+        let data_blocks = extract_named_blocks(&self.source, "data");
+        let mut models = Vec::with_capacity(data_blocks.len());
+        let field_regex = Regex::new(r"^(\w+)(?:\s*:\s*(\w+))?$").expect("static regex");
+        for (model_name, model_body) in data_blocks {
+            let mut fields = Vec::new();
+            for raw_field in model_body.split([',', '\n']) {
+                let raw_field = raw_field.trim();
+                if raw_field.is_empty() || raw_field.starts_with("//") {
+                    continue;
+                }
+                let capture = field_regex.captures(raw_field).ok_or_else(|| {
+                    SproutError::Parse(format!(
+                        "Invalid field declaration in data model {model_name}: {raw_field}"
+                    ))
+                })?;
+                fields.push(DataModelField {
+                    name: capture
+                        .get(1)
+                        .expect("field name capture")
+                        .as_str()
+                        .to_string(),
+                    type_name: capture
+                        .get(2)
+                        .map_or_else(|| "String".to_string(), |value| value.as_str().to_string()),
+                });
+            }
+            models.push(DataModel {
+                name: model_name,
+                fields,
+            });
+        }
+
         let screen_blocks = extract_named_blocks(&self.source, "screen");
         if screen_blocks.is_empty() {
             return Err(SproutError::Parse("At least one screen is required".to_string()).into());
@@ -39,14 +71,16 @@ impl Parser {
         let app = App {
             name,
             start_screen,
+            theme,
             screens,
             state: Vec::new(),
+            models,
         };
         self.validate_ast(&app)?;
         Ok(app)
     }
 
-    fn parse_app_declaration(&self) -> Result<(String, Option<String>)> {
+    fn parse_app_declaration(&self) -> Result<(String, Option<String>, String)> {
         let app_regex = Regex::new(r#"app\s+"([^"]+)"(?:\s*\{)?"#).expect("static regex");
         let capture = app_regex
             .captures(&self.source)
@@ -68,7 +102,15 @@ impl Parser {
             .and_then(|capture| capture.get(1))
             .map(|capture| capture.as_str().to_string());
 
-        Ok((name, start_screen))
+        let theme_regex =
+            Regex::new(r#"(?m)^\s*theme\s*=\s*"([^"]+)"\s*$"#).expect("static regex");
+        let theme = theme_regex
+            .captures(&self.source)
+            .and_then(|capture| capture.get(1))
+            .map(|capture| capture.as_str().to_string())
+            .unwrap_or_else(|| "Forest".to_string());
+
+        Ok((name, start_screen, theme))
     }
 
     fn parse_screen(&mut self, name: &str, body: &str) -> Result<Screen> {
@@ -951,6 +993,31 @@ screen Entry {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn parses_typed_data_models() {
+        let source = r#"app "Budget" { start = "Dashboard" }
+
+data Transaction {
+  label: String
+  amount: Number
+  kind: String
+  cleared: Boolean
+}
+
+screen Dashboard {
+  state transactions: []
+  ui {
+    records transactions [label, amount, kind, cleared]
+  }
+}"#;
+        let app = parse_sproutscript(source).expect("typed data model source parses");
+        assert_eq!(app.models.len(), 1);
+        assert_eq!(app.models[0].name, "Transaction");
+        assert_eq!(app.models[0].fields.len(), 4);
+        assert_eq!(app.models[0].fields[1].name, "amount");
+        assert_eq!(app.models[0].fields[1].type_name, "Number");
     }
 
     #[test]

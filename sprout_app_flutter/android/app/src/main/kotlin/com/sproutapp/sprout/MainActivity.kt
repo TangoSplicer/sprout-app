@@ -1,5 +1,6 @@
 package com.sproutapp.sprout
 
+import android.app.Activity
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.ClipData
@@ -11,6 +12,7 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricManager
@@ -39,6 +41,8 @@ class MainActivity: FlutterFragmentActivity() {
     private var nativeChannel: MethodChannel? = null
     private var pendingIncomingPackage: String? = null
     private var pendingLaunchProject: String? = null
+    private var pendingPhotoResult: MethodChannel.Result? = null
+    private var pendingPhotoFile: File? = null
 
     // Security: KeyStore for cryptographic operations
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply {
@@ -173,16 +177,71 @@ class MainActivity: FlutterFragmentActivity() {
                         result.error("INVALID_ARGUMENT", "Valid message required", null)
                     }
                 }
-                "takePhoto" -> {
-                    // Mock photo capture for test builds
-                    result.success("photo_captured_${System.currentTimeMillis()}.jpg")
-                }
-                "scanQrCode" -> {
-                    // Mock QR scan for test builds
-                    result.success("SPROUT_SCANNED_DATA_001")
-                }
+                "takePhoto" -> startPhotoCapture(result)
+                "scanQrCode" -> startBarcodeScan(result)
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun startPhotoCapture(result: MethodChannel.Result) {
+        if (pendingPhotoResult != null) {
+            result.error("BUSY", "A photo capture is already in progress", null)
+            return
+        }
+
+        val photoFile = File(cacheDir, "sprout_photo_${System.currentTimeMillis()}.jpg")
+        val photoUri = FileProvider.getUriForFile(
+            this,
+            "$packageName.sproutfiles",
+            photoFile,
+        )
+        val captureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+            putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }
+
+        if (captureIntent.resolveActivity(packageManager) == null) {
+            result.error("UNAVAILABLE", "No camera app is available on this device", null)
+            return
+        }
+
+        pendingPhotoResult = result
+        pendingPhotoFile = photoFile
+        try {
+            startActivityForResult(captureIntent, REQUEST_TAKE_PHOTO)
+        } catch (error: Exception) {
+            pendingPhotoResult = null
+            pendingPhotoFile = null
+            photoFile.delete()
+            result.error("CAMERA_FAILED", error.message, null)
+        }
+    }
+
+    private fun startBarcodeScan(result: MethodChannel.Result) {
+        val scanner = com.google.mlkit.vision.codescanner.GmsBarcodeScanning.getClient(this)
+        scanner.startScan()
+            .addOnSuccessListener { barcode -> result.success(barcode.rawValue) }
+            .addOnCanceledListener { result.success(null) }
+            .addOnFailureListener { error ->
+                result.error("SCAN_FAILED", error.message, null)
+            }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_TAKE_PHOTO) return
+
+        val callback = pendingPhotoResult ?: return
+        val photoFile = pendingPhotoFile
+        pendingPhotoResult = null
+        pendingPhotoFile = null
+
+        if (resultCode == Activity.RESULT_OK && photoFile?.exists() == true && photoFile.length() > 0) {
+            callback.success(photoFile.absolutePath)
+        } else {
+            photoFile?.delete()
+            callback.success(null)
         }
     }
 
@@ -394,6 +453,7 @@ class MainActivity: FlutterFragmentActivity() {
     companion object {
         private const val EXTRA_PROJECT_NAME = "sprout_project_name"
         private const val MAX_PACKAGE_BYTES = 2 * 1024 * 1024
+        private const val REQUEST_TAKE_PHOTO = 4101
     }
 
     override fun onResume() {

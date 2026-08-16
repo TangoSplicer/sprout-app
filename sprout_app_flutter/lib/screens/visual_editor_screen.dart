@@ -18,6 +18,7 @@ class VisualEditorScreen extends StatefulWidget {
 
 class _VisualEditorScreenState extends State<VisualEditorScreen> {
   late String _appName;
+  String _theme = 'Forest';
   final List<_VisualComponent> _components = [];
 
   @override
@@ -27,9 +28,10 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
   }
 
   void _parseSource(String source) {
-    // Extract app name
+    // Extract app name and theme
     final appMatch = RegExp(r'app\s+"([^"]+)"').firstMatch(source);
     _appName = appMatch?.group(1) ?? widget.projectName;
+    _theme = RegExp(r'theme\s*=\s*"([^"]+)"').firstMatch(source)?.group(1) ?? 'Forest';
 
     // Simple heuristic parser for existing elements to populate visual builder
     _components.clear();
@@ -96,6 +98,7 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
     final buffer = StringBuffer();
     buffer.writeln('app "$_appName" {');
     buffer.writeln('  start = "Home"');
+    buffer.writeln('  theme = "$_theme"');
     buffer.writeln('}');
     buffer.writeln('');
     buffer.writeln('screen Home {');
@@ -214,6 +217,43 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
     setState(() => _components.removeAt(index));
   }
 
+  Widget _buildThemePicker() {
+    final themes = ['Forest', 'Ocean', 'Sunset', 'Minimal'];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        children: [
+          const Text('App Style:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: themes.map((t) {
+                  final isSelected = _theme == t;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(t),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) setState(() => _theme = t);
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -250,6 +290,7 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                 ],
               ),
             ),
+            _buildThemePicker(),
             Expanded(
               child: ReorderableListView.builder(
                 padding: const EdgeInsets.all(16),
