@@ -102,8 +102,7 @@ impl Parser {
             .and_then(|capture| capture.get(1))
             .map(|capture| capture.as_str().to_string());
 
-        let theme_regex =
-            Regex::new(r#"(?m)^\s*theme\s*=\s*"([^"]+)"\s*$"#).expect("static regex");
+        let theme_regex = Regex::new(r#"(?m)^\s*theme\s*=\s*"([^"]+)"\s*$"#).expect("static regex");
         let theme = theme_regex
             .captures(&self.source)
             .and_then(|capture| capture.get(1))

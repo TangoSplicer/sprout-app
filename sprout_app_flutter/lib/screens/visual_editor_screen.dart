@@ -31,7 +31,8 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
     // Extract app name and theme
     final appMatch = RegExp(r'app\s+"([^"]+)"').firstMatch(source);
     _appName = appMatch?.group(1) ?? widget.projectName;
-    _theme = RegExp(r'theme\s*=\s*"([^"]+)"').firstMatch(source)?.group(1) ?? 'Forest';
+    _theme = RegExp(r'theme\s*=\s*"([^"]+)"').firstMatch(source)?.group(1) ??
+        'Forest';
 
     // Simple heuristic parser for existing elements to populate visual builder
     _components.clear();
@@ -39,9 +40,11 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
       final trimmed = line.trim();
       if (trimmed.startsWith('label ')) {
         final val = trimmed.substring(6).replaceAll('"', '').trim();
-        _components.add(_VisualComponent(type: _ComponentType.label, label: val));
+        _components
+            .add(_VisualComponent(type: _ComponentType.label, label: val));
       } else if (trimmed.startsWith('input ')) {
-        final match = RegExp(r'input\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)').firstMatch(trimmed);
+        final match = RegExp(r'input\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)')
+            .firstMatch(trimmed);
         if (match != null) {
           _components.add(_VisualComponent(
             type: _ComponentType.input,
@@ -50,7 +53,8 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
           ));
         }
       } else if (trimmed.startsWith('number ')) {
-        final match = RegExp(r'number\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)').firstMatch(trimmed);
+        final match = RegExp(r'number\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)')
+            .firstMatch(trimmed);
         if (match != null) {
           _components.add(_VisualComponent(
             type: _ComponentType.number,
@@ -59,7 +63,8 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
           ));
         }
       } else if (trimmed.startsWith('metric ')) {
-        final match = RegExp(r'metric\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)').firstMatch(trimmed);
+        final match = RegExp(r'metric\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)')
+            .firstMatch(trimmed);
         if (match != null) {
           _components.add(_VisualComponent(
             type: _ComponentType.metric,
@@ -87,8 +92,12 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
 
     if (_components.isEmpty) {
       _components.addAll([
-        const _VisualComponent(type: _ComponentType.label, label: 'Welcome to your app!'),
-        const _VisualComponent(type: _ComponentType.input, label: 'Type something', binding: 'userText'),
+        const _VisualComponent(
+            type: _ComponentType.label, label: 'Welcome to your app!'),
+        const _VisualComponent(
+            type: _ComponentType.input,
+            label: 'Type something',
+            binding: 'userText'),
         const _VisualComponent(type: _ComponentType.button, label: 'Save note'),
       ]);
     }
@@ -103,7 +112,10 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
     buffer.writeln('');
     buffer.writeln('screen Home {');
     // Collect state bindings
-    final bindings = _components.where((c) => c.binding.isNotEmpty).map((c) => c.binding).toSet();
+    final bindings = _components
+        .where((c) => c.binding.isNotEmpty)
+        .map((c) => c.binding)
+        .toSet();
     for (final b in bindings) {
       buffer.writeln('  state $b = ""');
     }
@@ -150,19 +162,19 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
         case _ComponentType.chart:
           buffer.writeln('      chart "${c.label}" items amount by bar');
           break;
-      case _ComponentType.audio:
-        buffer.writeln('      audio "${c.label}" -> ${c.binding}');
-        break;
-      case _ComponentType.camera:
-        buffer.writeln('      camera "${c.label}" -> ${c.binding}');
-        break;
-      case _ComponentType.scan:
-        buffer.writeln('      button "${c.label}" {');
-        buffer.writeln('        scan -> ${c.binding}');
-        buffer.writeln('      }');
-        break;
+        case _ComponentType.audio:
+          buffer.writeln('      audio "${c.label}" -> ${c.binding}');
+          break;
+        case _ComponentType.camera:
+          buffer.writeln('      camera "${c.label}" -> ${c.binding}');
+          break;
+        case _ComponentType.scan:
+          buffer.writeln('      button "${c.label}" {');
+          buffer.writeln('        scan -> ${c.binding}');
+          buffer.writeln('      }');
+          break;
+      }
     }
-  }
 
     buffer.writeln('    }');
     buffer.writeln('  }');
@@ -174,40 +186,68 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
     setState(() {
       switch (type) {
         case _ComponentType.label:
-          _components.add(const _VisualComponent(type: _ComponentType.label, label: 'New label text'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.label, label: 'New label text'));
           break;
         case _ComponentType.input:
-          _components.add(const _VisualComponent(type: _ComponentType.input, label: 'New field', binding: 'fieldInput'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.input,
+              label: 'New field',
+              binding: 'fieldInput'));
           break;
         case _ComponentType.number:
-          _components.add(const _VisualComponent(type: _ComponentType.number, label: 'Amount', binding: 'amountVal'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.number,
+              label: 'Amount',
+              binding: 'amountVal'));
           break;
         case _ComponentType.metric:
-          _components.add(const _VisualComponent(type: _ComponentType.metric, label: 'Total', binding: 'totalVal'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.metric,
+              label: 'Total',
+              binding: 'totalVal'));
           break;
         case _ComponentType.list:
-          _components.add(const _VisualComponent(type: _ComponentType.list, label: 'Items', binding: 'itemsList'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.list, label: 'Items', binding: 'itemsList'));
           break;
         case _ComponentType.button:
-          _components.add(const _VisualComponent(type: _ComponentType.button, label: 'Perform Action'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.button, label: 'Perform Action'));
           break;
         case _ComponentType.sync:
-          _components.add(const _VisualComponent(type: _ComponentType.sync, label: 'Sync with peers', binding: 'itemsList'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.sync,
+              label: 'Sync with peers',
+              binding: 'itemsList'));
           break;
         case _ComponentType.notify:
-          _components.add(const _VisualComponent(type: _ComponentType.notify, label: 'Send notification', binding: 'Update completed!'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.notify,
+              label: 'Send notification',
+              binding: 'Update completed!'));
           break;
         case _ComponentType.chart:
-          _components.add(const _VisualComponent(type: _ComponentType.chart, label: 'Spending Breakdown'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.chart, label: 'Spending Breakdown'));
           break;
         case _ComponentType.audio:
-          _components.add(const _VisualComponent(type: _ComponentType.audio, label: 'Voice Note', binding: 'voiceNote'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.audio,
+              label: 'Voice Note',
+              binding: 'voiceNote'));
           break;
         case _ComponentType.camera:
-          _components.add(const _VisualComponent(type: _ComponentType.camera, label: 'Take Photo', binding: 'photoPath'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.camera,
+              label: 'Take Photo',
+              binding: 'photoPath'));
           break;
         case _ComponentType.scan:
-          _components.add(const _VisualComponent(type: _ComponentType.scan, label: 'Scan QR Code', binding: 'scannedData'));
+          _components.add(const _VisualComponent(
+              type: _ComponentType.scan,
+              label: 'Scan QR Code',
+              binding: 'scannedData'));
           break;
       }
     });
@@ -227,7 +267,8 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
       ),
       child: Row(
         children: [
-          const Text('App Style:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('App Style:',
+              style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 12),
           Expanded(
             child: SingleChildScrollView(
@@ -308,11 +349,15 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                     key: ValueKey(item),
                     margin: const EdgeInsets.only(bottom: 10),
                     child: ListTile(
-                      leading: Icon(_iconForType(item.type), color: SproutTheme.forest),
-                      title: Text(item.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: Text('${item.type.name.toUpperCase()}${item.binding.isNotEmpty ? ' • ${item.binding}' : ''}'),
+                      leading: Icon(_iconForType(item.type),
+                          color: SproutTheme.forest),
+                      title: Text(item.label,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text(
+                          '${item.type.name.toUpperCase()}${item.binding.isNotEmpty ? ' • ${item.binding}' : ''}'),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        icon: const Icon(Icons.delete_outline,
+                            color: Colors.redAccent),
                         onPressed: () => _removeItem(index),
                       ),
                     ),
@@ -336,7 +381,8 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    const Text('Add component:', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const Text('Add component:',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                     const SizedBox(width: 12),
                     ActionChip(
                       avatar: const Icon(Icons.text_fields, size: 16),
@@ -381,7 +427,8 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                     ),
                     const SizedBox(width: 8),
                     ActionChip(
-                      avatar: const Icon(Icons.notifications_active_outlined, size: 16),
+                      avatar: const Icon(Icons.notifications_active_outlined,
+                          size: 16),
                       label: const Text('Notify'),
                       onPressed: () => _addComponent(_ComponentType.notify),
                     ),
@@ -405,7 +452,8 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                     ),
                     const SizedBox(width: 8),
                     ActionChip(
-                      avatar: const Icon(Icons.qr_code_scanner_rounded, size: 16),
+                      avatar:
+                          const Icon(Icons.qr_code_scanner_rounded, size: 16),
                       label: const Text('Scan'),
                       onPressed: () => _addComponent(_ComponentType.scan),
                     ),
@@ -449,7 +497,20 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
   }
 }
 
-enum _ComponentType { label, input, number, metric, list, button, sync, notify, chart, audio, camera, scan }
+enum _ComponentType {
+  label,
+  input,
+  number,
+  metric,
+  list,
+  button,
+  sync,
+  notify,
+  chart,
+  audio,
+  camera,
+  scan
+}
 
 class _VisualComponent {
   final _ComponentType type;

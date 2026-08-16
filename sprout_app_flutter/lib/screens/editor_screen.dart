@@ -236,11 +236,13 @@ class _EditorScreenState extends State<EditorScreen> {
               final restored = await Navigator.push<bool>(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => VersionHistoryScreen(projectName: widget.projectName),
+                  builder: (_) =>
+                      VersionHistoryScreen(projectName: widget.projectName),
                 ),
               );
               if (restored == true && mounted) {
-                _codeFuture = ProjectService().readFile(widget.projectName, 'main.sprout');
+                _codeFuture = ProjectService()
+                    .readFile(widget.projectName, 'main.sprout');
                 final content = await _codeFuture;
                 if (!mounted) return;
                 setState(() {
@@ -326,86 +328,93 @@ class _EditorScreenState extends State<EditorScreen> {
         elevation: Theme.of(context).bottomAppBarTheme.elevation ?? 0,
         child: SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _save,
-                        icon: const Icon(Icons.save_outlined),
-                        label: const Text('Save'),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.34,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _save,
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('Save'),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          final navigator = Navigator.of(context);
-                          final previewCode = controller?.text;
-                          if (previewCode == null) return;
-                          final saved = await _save(announce: false);
-                          final compiled =
-                              saved && await _compile(announce: false);
-                          if (!mounted || !compiled) return;
-                          await navigator.push(
-                            MaterialPageRoute(
-                              builder: (_) => PreviewScreen(
-                                code: previewCode,
-                                projectName: widget.projectName,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () async {
+                            final navigator = Navigator.of(context);
+                            final previewCode = controller?.text;
+                            if (previewCode == null) return;
+                            final saved = await _save(announce: false);
+                            final compiled =
+                                saved && await _compile(announce: false);
+                            if (!mounted || !compiled) return;
+                            await navigator.push(
+                              MaterialPageRoute(
+                                builder: (_) => PreviewScreen(
+                                  code: previewCode,
+                                  projectName: widget.projectName,
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Preview'),
+                            );
+                          },
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: const Text('Preview'),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final currentCode = controller?.text;
-                          if (currentCode == null) return;
-                          final result = await Navigator.push<String>(
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final currentCode = controller?.text;
+                            if (currentCode == null) return;
+                            final result = await Navigator.push<String>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => LanguageToolsScreen(
+                                  projectName: widget.projectName,
+                                  source: currentCode,
+                                ),
+                              ),
+                            );
+                            if (result != null) {
+                              await _applyReviewedCode(result);
+                            }
+                          },
+                          icon: const Icon(Icons.rate_review_outlined),
+                          label: const Text('Review source'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => LanguageToolsScreen(
-                                projectName: widget.projectName,
-                                source: currentCode,
-                              ),
+                              builder: (_) =>
+                                  ShareScreen(projectName: widget.projectName),
                             ),
-                          );
-                          if (result != null) await _applyReviewedCode(result);
-                        },
-                        icon: const Icon(Icons.rate_review_outlined),
-                        label: const Text('Review source'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ShareScreen(projectName: widget.projectName),
                           ),
+                          icon: const Icon(Icons.ios_share),
+                          label: const Text('Share'),
                         ),
-                        icon: const Icon(Icons.ios_share),
-                        label: const Text('Share'),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

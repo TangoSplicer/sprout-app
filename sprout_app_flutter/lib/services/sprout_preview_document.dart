@@ -326,7 +326,11 @@ class SproutPreviewDocument {
         return null;
       case SproutPreviewScan(:final bindTo):
         return SproutPreviewScanRequest(bindTo);
-      case SproutPreviewIf(:final condition, :final thenActions, :final elseActions):
+      case SproutPreviewIf(
+          :final condition,
+          :final thenActions,
+          :final elseActions
+        ):
         if (_evaluateCondition(condition)) {
           for (final a in thenActions) {
             _runAction(a);
@@ -642,7 +646,7 @@ class SproutPreviewDocument {
 
   static List<SproutPreviewAction> _parseActions(String source) {
     final actions = <SproutPreviewAction>[];
-    
+
     // Handle nested blocks first
     final ifRegex = RegExp(r'^if\s+(.+?)\s*\{');
     final loopRegex = RegExp(r'^for\s+(\w+)\s+in\s+(.+?)\s*\{');
@@ -672,7 +676,7 @@ class SproutPreviewDocument {
         final condition = ifMatch.group(1)!.trim();
         var blockSource = '';
         var depth = 1;
-        
+
         final remainder = value.substring(ifMatch.end).trim();
         if (remainder.isNotEmpty) {
           blockSource = remainder;
@@ -683,17 +687,20 @@ class SproutPreviewDocument {
         while (depth > 0 && index < lines.length) {
           final next = lines[index++].trim();
           if (next.isEmpty || next.startsWith('//')) continue;
-          
+
           if (depth == 1 && next.contains('else') && next.contains('}')) {
             final closingIdx = next.indexOf('}');
             final ifPart = next.substring(0, closingIdx).trim();
             if (ifPart.isNotEmpty) {
-              blockSource = blockSource.isEmpty ? ifPart : '$blockSource\n$ifPart';
+              blockSource =
+                  blockSource.isEmpty ? ifPart : '$blockSource\n$ifPart';
             }
-            
+
             var elseSource = next.substring(closingIdx + 1).trim();
             var elseDepth = 1;
-            final elseRemainder = elseSource.contains('{') ? elseSource.substring(elseSource.indexOf('{') + 1).trim() : elseSource;
+            final elseRemainder = elseSource.contains('{')
+                ? elseSource.substring(elseSource.indexOf('{') + 1).trim()
+                : elseSource;
             elseSource = elseRemainder;
             if (elseSource.isNotEmpty) {
               elseDepth += _braceDelta(elseSource);
@@ -708,12 +715,13 @@ class SproutPreviewDocument {
                 break;
               }
               elseDepth += delta;
-              elseSource = elseSource.isEmpty ? subNext : '$elseSource\n$subNext';
+              elseSource =
+                  elseSource.isEmpty ? subNext : '$elseSource\n$subNext';
             }
             elseActions = _parseActions(elseSource);
             break;
           }
-          
+
           final delta = _braceDelta(next);
           if (depth == 1 && (delta < 0 || next.startsWith('}'))) {
             break;
@@ -721,7 +729,7 @@ class SproutPreviewDocument {
           depth += delta;
           blockSource = blockSource.isEmpty ? next : '$blockSource\n$next';
         }
-        
+
         final thenActions = _parseActions(blockSource);
 
         if (elseActions == null && index < lines.length) {
@@ -735,8 +743,10 @@ class SproutPreviewDocument {
               index = peekIndex + 1;
               var elseSource = '';
               var elseDepth = 1;
-              
-              final elseRemainder = peekLine.contains('{') ? peekLine.substring(peekLine.indexOf('{') + 1).trim() : '';
+
+              final elseRemainder = peekLine.contains('{')
+                  ? peekLine.substring(peekLine.indexOf('{') + 1).trim()
+                  : '';
               if (elseRemainder.isNotEmpty) {
                 elseSource = elseRemainder;
                 elseDepth += _braceDelta(elseRemainder);
@@ -751,7 +761,8 @@ class SproutPreviewDocument {
                   break;
                 }
                 elseDepth += delta;
-                elseSource = elseSource.isEmpty ? subNext : '$elseSource\n$subNext';
+                elseSource =
+                    elseSource.isEmpty ? subNext : '$elseSource\n$subNext';
               }
               elseActions = _parseActions(elseSource);
             }
@@ -775,8 +786,9 @@ class SproutPreviewDocument {
         }
         final closing = blockSource.lastIndexOf('}');
         if (closing >= 0) blockSource = blockSource.substring(0, closing);
-        
-        actions.add(SproutPreviewLoop(variable, range, _parseActions(blockSource)));
+
+        actions.add(
+            SproutPreviewLoop(variable, range, _parseActions(blockSource)));
         continue;
       }
 

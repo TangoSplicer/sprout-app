@@ -118,7 +118,7 @@ impl CodeGenerator {
         // Generate screen composables
         for screen in &app.screens {
             android_code.push_str(&format!(
-                "@Composable\nfun {}Screen(state: MutableState<ScreenState>) {{\n",
+                "@Composable\nfun {}Screen(state: MutableState<ScreenState>, onAction: (String) -> Unit) {{\n",
                 screen.name
             ));
 
@@ -131,8 +131,11 @@ impl CodeGenerator {
                     }
                     UiElement::Button { label, action } => {
                         let sanitized = self.sanitize_for_android(label)?;
+                        let action_descriptor =
+                            self.sanitize_for_android(&format!("{action:?}"))?;
                         android_code.push_str(&format!(
-                            "    Button(onClick = {{ /* TODO: {action:?} */ }}) {{\n"
+                            "    Button(onClick = {{ onAction(\"{}\") }}) {{\n",
+                            action_descriptor
                         ));
                         android_code.push_str(&format!("        Text(\"{}\")\n", sanitized));
                         android_code.push_str("    }\n");
@@ -158,6 +161,7 @@ impl CodeGenerator {
         // Generate screen views
         for screen in &app.screens {
             ios_code.push_str(&format!("struct {}View: View {{\n", screen.name));
+            ios_code.push_str("    let onAction: (String) -> Void\n");
             ios_code.push_str("    var body: some View {\n");
 
             // Generate UI elements
@@ -169,8 +173,10 @@ impl CodeGenerator {
                     }
                     UiElement::Button { label, action } => {
                         let sanitized = self.sanitize_for_ios(label)?;
+                        let action_descriptor = self.sanitize_for_ios(&format!("{action:?}"))?;
                         ios_code.push_str(&format!(
-                            "        Button(action: {{ /* TODO: {action:?} */ }}) {{\n"
+                            "        Button(action: {{ onAction(\"{}\") }}) {{\n",
+                            action_descriptor
                         ));
                         ios_code.push_str(&format!("            Text(\"{}\")\n", sanitized));
                         ios_code.push_str("        }\n");

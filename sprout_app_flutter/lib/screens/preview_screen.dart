@@ -115,7 +115,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     super.dispose();
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     final document = _document;
     final theme = SproutTheme.light(preset: document?.theme ?? 'Forest');
@@ -385,7 +385,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
           ),
         ),
       SproutPreviewDivider() => const Divider(height: 32),
-      SproutPreviewChart(:final title, :final collection, :final amountField, :final chartType) => Card(
+      SproutPreviewChart(
+        :final title,
+        :final collection,
+        :final amountField,
+        :final chartType
+      ) =>
+        Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -394,24 +400,32 @@ class _PreviewScreenState extends State<PreviewScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.bar_chart_rounded, color: Theme.of(context).colorScheme.primary),
+                    Icon(Icons.bar_chart_rounded,
+                        color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         document.resolveTemplate(title),
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 16),
                       ),
                     ),
                     Chip(
-                      label: Text(chartType.toUpperCase(), style: const TextStyle(fontSize: 10)),
-                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                      label: Text(chartType.toUpperCase(),
+                          style: const TextStyle(fontSize: 10)),
+                      backgroundColor:
+                          Theme.of(context).colorScheme.secondaryContainer,
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 ...document.recordListValue(collection).take(5).map((record) {
-                  final name = record['label']?.toString() ?? record['name']?.toString() ?? 'Entry';
-                  final amount = record[amountField] is num ? (record[amountField] as num).toDouble() : 0.0;
+                  final name = record['label']?.toString() ??
+                      record['name']?.toString() ??
+                      'Entry';
+                  final amount = record[amountField] is num
+                      ? (record[amountField] as num).toDouble()
+                      : 0.0;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Column(
@@ -420,8 +434,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                            Text('$amount', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
+                            Text(name,
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text('$amount',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color:
+                                        Theme.of(context).colorScheme.primary)),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -445,8 +465,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                  child: Icon(Icons.play_arrow_rounded, color: Theme.of(context).colorScheme.primary),
+                  backgroundColor:
+                      Theme.of(context).colorScheme.secondaryContainer,
+                  child: Icon(Icons.play_arrow_rounded,
+                      color: Theme.of(context).colorScheme.primary),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -460,13 +482,15 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       const SizedBox(height: 4),
                       Text(
                         source,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.volume_up_rounded, color: Theme.of(context).colorScheme.primary),
+                  icon: Icon(Icons.volume_up_rounded,
+                      color: Theme.of(context).colorScheme.primary),
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Playing audio clip...')),
@@ -487,8 +511,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                      child: Icon(Icons.camera_alt_rounded, color: Theme.of(context).colorScheme.primary),
+                      backgroundColor:
+                          Theme.of(context).colorScheme.secondaryContainer,
+                      child: Icon(Icons.camera_alt_rounded,
+                          color: Theme.of(context).colorScheme.primary),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -501,8 +527,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            document.resolveTemplate(binding).isEmpty ? 'No photo captured yet' : 'Captured: ${document.resolveTemplate(binding)}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            document.resolveTemplate(binding).isEmpty
+                                ? 'No photo captured yet'
+                                : 'Captured: ${document.resolveTemplate(binding)}',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600),
                           ),
                         ],
                       ),
@@ -513,7 +542,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => _handlePhoto(SproutPreviewPhotoRequest(binding)),
+                    onPressed: () =>
+                        _handlePhoto(SproutPreviewPhotoRequest(binding)),
                     icon: const Icon(Icons.camera_rounded),
                     label: const Text('Capture Photo'),
                   ),

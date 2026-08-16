@@ -35,6 +35,9 @@ void main() {
   testWidgets(
       'terminal command help scrolls instead of overflowing in a short pane',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 160));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(

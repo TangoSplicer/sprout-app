@@ -56,7 +56,7 @@ abstract final class SproutTheme {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        titleTextStyle: const TextStyle(
           color: ink,
           fontSize: 20,
           fontWeight: FontWeight.w800,

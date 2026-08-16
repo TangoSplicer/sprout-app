@@ -3,6 +3,9 @@
 
 import 'dart:async';
 
+import 'project_service.dart';
+import 'sprout_preview_document.dart';
+
 enum SandboxLevel { restricted, standard, unrestricted }
 
 enum SandboxViolationType {
@@ -190,10 +193,23 @@ class SandboxService {
       };
     }
 
+    final codeBytes = code.codeUnits.length * 2;
+    if (codeBytes > maxMemory) {
+      final violation = SandboxViolation(
+        type: SandboxViolationType.memoryLimit,
+        message: 'Source exceeds the sandbox memory limit',
+      );
+      _violations.add(violation);
+      return {
+        'success': false,
+        'violations': [violation.toString()],
+      };
+    }
+
     // Security: Execute with timeout
     try {
       final result = await timeoutFuture(
-        _executeCodeInternal(code),
+        _executeCodeInternal(code, maxMemory: maxMemory),
         timeout: timeout,
       );
 
@@ -219,11 +235,25 @@ class SandboxService {
     }
   }
 
-  // Security: Internal code execution
-  Future<dynamic> _executeCodeInternal(String code) async {
-    // Security: This would integrate with the WASM runtime
-    // For now, return a placeholder
-    return {'status': 'executed'};
+  // Security: Internal code execution through the real Rust-backed compiler.
+  Future<Map<String, dynamic>> _executeCodeInternal(
+    String code, {
+    required int maxMemory,
+  }) async {
+    final compiled = await ProjectService().compileCode(code);
+    if (compiled.length > maxMemory) {
+      throw StateError('Compiled output exceeds the sandbox memory limit');
+    }
+
+    final preview = SproutPreviewDocument.parse(code);
+    return {
+      'status': 'compiled',
+      'app_name': preview.appName,
+      'start_screen': preview.startScreen,
+      'screen': preview.screenName,
+      'compiled_bytes': compiled.length,
+      'state_keys': preview.exportState().keys.toList(growable: false),
+    };
   }
 
   // Security: Check if function is allowed

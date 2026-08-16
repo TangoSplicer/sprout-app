@@ -120,9 +120,11 @@ class _DebugConsoleState extends State<DebugConsole>
         color: Colors.grey.shade800,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
+          SizedBox(
+            width: double.infinity,
             child: TabBar(
               controller: _tabController,
               isScrollable: true,
@@ -169,37 +171,42 @@ class _DebugConsoleState extends State<DebugConsole>
               ],
             ),
           ),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  _autoScroll
-                      ? Icons.vertical_align_bottom
-                      : Icons.vertical_align_top,
-                  color: Colors.grey.shade400,
-                  size: 18,
+          Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    _autoScroll
+                        ? Icons.vertical_align_bottom
+                        : Icons.vertical_align_top,
+                    color: Colors.grey.shade400,
+                    size: 18,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _autoScroll = !_autoScroll;
+                    });
+                    if (_autoScroll) {
+                      _scrollToBottom();
+                    }
+                  },
+                  tooltip: _autoScroll
+                      ? 'Disable auto-scroll'
+                      : 'Enable auto-scroll',
                 ),
-                onPressed: () {
-                  setState(() {
-                    _autoScroll = !_autoScroll;
-                  });
-                  if (_autoScroll) {
-                    _scrollToBottom();
-                  }
-                },
-                tooltip:
-                    _autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll',
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.clear,
-                  color: Colors.grey.shade400,
-                  size: 18,
+                IconButton(
+                  icon: Icon(
+                    Icons.clear,
+                    color: Colors.grey.shade400,
+                    size: 18,
+                  ),
+                  onPressed: widget.onClear,
+                  tooltip: 'Clear console',
                 ),
-                onPressed: widget.onClear,
-                tooltip: 'Clear console',
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
