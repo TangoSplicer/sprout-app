@@ -134,6 +134,16 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
           }
           buffer.writeln('      }');
           break;
+        case _ComponentType.sync:
+          buffer.writeln('      button "${c.label}" {');
+          buffer.writeln('        sync ${c.binding}');
+          buffer.writeln('      }');
+          break;
+        case _ComponentType.notify:
+          buffer.writeln('      button "${c.label}" {');
+          buffer.writeln('        notify "${c.binding}"');
+          buffer.writeln('      }');
+          break;
       }
     }
 
@@ -163,6 +173,12 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
           break;
         case _ComponentType.button:
           _components.add(const _VisualComponent(type: _ComponentType.button, label: 'Perform Action'));
+          break;
+        case _ComponentType.sync:
+          _components.add(const _VisualComponent(type: _ComponentType.sync, label: 'Sync with peers', binding: 'itemsList'));
+          break;
+        case _ComponentType.notify:
+          _components.add(const _VisualComponent(type: _ComponentType.notify, label: 'Send notification', binding: 'Update completed!'));
           break;
       }
     });
@@ -290,6 +306,18 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                       label: const Text('Button'),
                       onPressed: () => _addComponent(_ComponentType.button),
                     ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.sync_rounded, size: 16),
+                      label: const Text('Sync P2P'),
+                      onPressed: () => _addComponent(_ComponentType.sync),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.notifications_active_outlined, size: 16),
+                      label: const Text('Notify'),
+                      onPressed: () => _addComponent(_ComponentType.notify),
+                    ),
                   ],
                 ),
               ),
@@ -314,11 +342,15 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
         return Icons.list_alt;
       case _ComponentType.button:
         return Icons.smart_button;
+      case _ComponentType.sync:
+        return Icons.sync_rounded;
+      case _ComponentType.notify:
+        return Icons.notifications_active_outlined;
     }
   }
 }
 
-enum _ComponentType { label, input, number, metric, list, button }
+enum _ComponentType { label, input, number, metric, list, button, sync, notify }
 
 class _VisualComponent {
   final _ComponentType type;

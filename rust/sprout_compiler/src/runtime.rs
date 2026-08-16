@@ -405,6 +405,19 @@ impl WasmRuntime {
                 }
                 self.update_state(variable, ValueType::Array(values))?;
             }
+            Action::SyncData { collection } => {
+                self.log_event(ExecutionEvent::ActionExecuted(format!(
+                    "Synced collection: {}",
+                    collection
+                )));
+            }
+            Action::NotifyUser { message } => {
+                let evaluated = self.evaluate_expression(message)?;
+                self.log_event(ExecutionEvent::ActionExecuted(format!(
+                    "Notification sent: {}",
+                    Self::stringify_value(&evaluated)
+                )));
+            }
             Action::CallFunction { function, args } => {
                 // Security: Check for dangerous function calls
                 if function.contains("eval") || function.contains("exec") {

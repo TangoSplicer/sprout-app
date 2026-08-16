@@ -164,6 +164,15 @@ class MainActivity: FlutterFragmentActivity() {
                         }
                     }
                 }
+                "notifyUser" -> {
+                    val message = call.argument<String>("message")?.trim()
+                    if (!message.isNullOrEmpty() && message.length <= 500) {
+                        scheduleReminder(message, System.currentTimeMillis() + 500)
+                        result.success(null)
+                    } else {
+                        result.error("INVALID_ARGUMENT", "Valid message required", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

@@ -48,6 +48,14 @@ class NativeBridge {
     });
   }
 
+  static Future<void> notifyUser(String message) async {
+    try {
+      await _channel.invokeMethod('notifyUser', {'message': message});
+    } catch (_) {
+      // Fallback if platform notification channel is unavailable
+    }
+  }
+
   static Future<void> playSound(String asset) async {
     await _channel.invokeMethod('playSound', {'asset': asset});
   }

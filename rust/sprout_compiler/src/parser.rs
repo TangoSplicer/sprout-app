@@ -464,6 +464,8 @@ impl Parser {
         let clear_regex = Regex::new(r"^clear\s+(\w+)$").expect("static regex");
         let assignment_regex = Regex::new(r"^(\w+)\s*=\s*(.+)$").expect("static regex");
         let navigation_regex = Regex::new(r"^(?:go|navigate)\s+(\w+)$").expect("static regex");
+        let sync_regex = Regex::new(r"^sync\s+(\w+)$").expect("static regex");
+        let notify_regex = Regex::new(r#"^notify\s+"([^"]+)"$"#).expect("static regex");
 
         let mut actions = Vec::new();
         for statement in source.split(['\n', ';']) {
@@ -568,6 +570,22 @@ impl Parser {
             } else if let Some(capture) = navigation_regex.captures(statement) {
                 actions.push(Action::Navigation {
                     target: capture.get(1).expect("target capture").as_str().to_string(),
+                });
+            } else if let Some(capture) = sync_regex.captures(statement) {
+                actions.push(Action::SyncData {
+                    collection: capture
+                        .get(1)
+                        .expect("collection capture")
+                        .as_str()
+                        .to_string(),
+                });
+            } else if let Some(capture) = notify_regex.captures(statement) {
+                actions.push(Action::NotifyUser {
+                    message: capture
+                        .get(1)
+                        .expect("message capture")
+                        .as_str()
+                        .to_string(),
                 });
             } else if let Some(capture) = assignment_regex.captures(statement) {
                 actions.push(Action::UpdateState {

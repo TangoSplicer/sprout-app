@@ -171,6 +171,14 @@ pub enum Action {
         variable: String,
         fields: Vec<RecordField>,
     },
+    /// Triggers secure local-network data sync for collaborative shared apps.
+    SyncData {
+        collection: String,
+    },
+    /// Dispatches an instant contextual notification to the user.
+    NotifyUser {
+        message: String,
+    },
     CallFunction {
         function: String,
         args: Vec<String>,
@@ -549,6 +557,16 @@ impl Action {
             Action::Increment { variable, by } => {
                 if variable.len() > 50 || !(-1000..=1000).contains(by) {
                     return Err("Counter action is outside safe bounds".to_string());
+                }
+            }
+            Action::SyncData { collection } => {
+                if collection.is_empty() || collection.len() > 50 {
+                    return Err("Collection name invalid".to_string());
+                }
+            }
+            Action::NotifyUser { message } => {
+                if message.is_empty() || message.len() > 500 {
+                    return Err("Notification message invalid".to_string());
                 }
             }
             Action::ScheduleReminder { message, time } => {

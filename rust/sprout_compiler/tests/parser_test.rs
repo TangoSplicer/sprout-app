@@ -16,4 +16,23 @@ mod tests {
         let result = Parser::new(source).parse();
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_parse_sync_and_notify_actions() {
+        let source = r#"
+            app "Collaborative App" {
+              start = Home
+            }
+            screen Home {
+              ui {
+                button "Sync Now" {
+                  sync tasks
+                  notify "Sync complete!"
+                }
+              }
+            }
+        "#;
+        let result = Parser::new(source).parse();
+        assert!(result.is_ok());
+    }
 }

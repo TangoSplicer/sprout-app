@@ -281,6 +281,22 @@ impl CodeGenerator {
                     indent = indent * 4
                 ));
             }
+            Action::SyncData { collection } => {
+                code.push_str(&format!(
+                    "{:indent$};; Sync collection {}\n",
+                    "",
+                    collection,
+                    indent = indent * 4
+                ));
+            }
+            Action::NotifyUser { message } => {
+                code.push_str(&format!(
+                    "{:indent$};; Notify user {}\n",
+                    "",
+                    message,
+                    indent = indent * 4
+                ));
+            }
             Action::CallFunction { function, args } => {
                 // Security: Validate function call
                 if function.contains("eval") || function.contains("exec") {
