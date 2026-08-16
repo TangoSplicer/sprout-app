@@ -378,9 +378,98 @@ class _PreviewScreenState extends State<PreviewScreen> {
             title: Text(document.resolveTemplate(label)),
           ),
         ),
-      SproutPreviewDivider() => const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Divider(),
+      SproutPreviewDivider() => const Divider(height: 32),
+      SproutPreviewChart(:final title, :final collection, :final amountField, :final chartType) => Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.bar_chart_rounded, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        document.resolveTemplate(title),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
+                    ),
+                    Chip(
+                      label: Text(chartType.toUpperCase(), style: const TextStyle(fontSize: 10)),
+                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...document.recordListValue(collection).take(5).map((record) {
+                  final name = record['label']?.toString() ?? record['name']?.toString() ?? 'Entry';
+                  final amount = record[amountField] is num ? (record[amountField] as num).toDouble() : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text('$amount', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(
+                          value: (amount / 100.0).clamp(0.0, 1.0),
+                          backgroundColor: Colors.grey.shade200,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      SproutPreviewAudioPlayer(:final label, :final source) => Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                  child: Icon(Icons.play_arrow_rounded, color: Theme.of(context).colorScheme.primary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        document.resolveTemplate(label),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        source,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.volume_up_rounded, color: Theme.of(context).colorScheme.primary),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Playing audio clip...')),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
       SproutPreviewButton(:final label) => Padding(
           padding: const EdgeInsets.only(top: 8),

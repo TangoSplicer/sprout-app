@@ -281,6 +281,17 @@ impl WasmRuntime {
                 }
             }
             UiElement::Divider => {}
+            UiElement::Chart {
+                title, collection, ..
+            } => {
+                self.track_memory_usage(title.len());
+                if !self.state.contains_key(collection) {
+                    self.update_state(collection, ValueType::Array(Vec::new()))?;
+                }
+            }
+            UiElement::AudioPlayer { label, source } => {
+                self.track_memory_usage(label.len() + source.len());
+            }
         }
 
         Ok(())
@@ -417,6 +428,19 @@ impl WasmRuntime {
                     "Notification sent: {}",
                     Self::stringify_value(&evaluated)
                 )));
+            }
+            Action::Fetch { url, bind_to } => {
+                if url.starts_with("http://") && !url.starts_with("http://localhost") {
+                    return Err(anyhow::anyhow!("Insecure HTTP connection not allowed"));
+                }
+                self.log_event(ExecutionEvent::ActionExecuted(format!(
+                    "Fetched data from {}",
+                    url
+                )));
+                self.update_state(
+                    bind_to,
+                    ValueType::String(format!("Fetched data from {}", url)),
+                )?;
             }
             Action::CallFunction { function, args } => {
                 // Security: Check for dangerous function calls

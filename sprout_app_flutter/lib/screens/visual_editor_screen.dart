@@ -144,6 +144,12 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
           buffer.writeln('        notify "${c.binding}"');
           buffer.writeln('      }');
           break;
+        case _ComponentType.chart:
+          buffer.writeln('      chart "${c.label}" items amount by bar');
+          break;
+        case _ComponentType.audio:
+          buffer.writeln('      audio "${c.label}" -> ${c.binding}');
+          break;
       }
     }
 
@@ -179,6 +185,12 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
           break;
         case _ComponentType.notify:
           _components.add(const _VisualComponent(type: _ComponentType.notify, label: 'Send notification', binding: 'Update completed!'));
+          break;
+        case _ComponentType.chart:
+          _components.add(const _VisualComponent(type: _ComponentType.chart, label: 'Spending Breakdown'));
+          break;
+        case _ComponentType.audio:
+          _components.add(const _VisualComponent(type: _ComponentType.audio, label: 'Voice Note', binding: 'voiceNote'));
           break;
       }
     });
@@ -318,6 +330,18 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
                       label: const Text('Notify'),
                       onPressed: () => _addComponent(_ComponentType.notify),
                     ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.bar_chart_rounded, size: 16),
+                      label: const Text('Chart'),
+                      onPressed: () => _addComponent(_ComponentType.chart),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.audiotrack_rounded, size: 16),
+                      label: const Text('Audio'),
+                      onPressed: () => _addComponent(_ComponentType.audio),
+                    ),
                   ],
                 ),
               ),
@@ -346,11 +370,15 @@ class _VisualEditorScreenState extends State<VisualEditorScreen> {
         return Icons.sync_rounded;
       case _ComponentType.notify:
         return Icons.notifications_active_outlined;
+      case _ComponentType.chart:
+        return Icons.bar_chart_rounded;
+      case _ComponentType.audio:
+        return Icons.audiotrack_rounded;
     }
   }
 }
 
-enum _ComponentType { label, input, number, metric, list, button, sync, notify }
+enum _ComponentType { label, input, number, metric, list, button, sync, notify, chart, audio }
 
 class _VisualComponent {
   final _ComponentType type;

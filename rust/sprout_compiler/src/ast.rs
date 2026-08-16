@@ -115,6 +115,18 @@ pub enum UiElement {
     },
     /// A visual separator for longer task-focused screens.
     Divider,
+    /// A visual data chart (bar, line, or pie) rendered from a record collection.
+    Chart {
+        title: String,
+        collection: String,
+        amount_field: String,
+        chart_type: String,
+    },
+    /// An audio playback or voice note element.
+    AudioPlayer {
+        label: String,
+        source: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,6 +190,11 @@ pub enum Action {
     /// Dispatches an instant contextual notification to the user.
     NotifyUser {
         message: String,
+    },
+    /// Fetches public JSON data from an allowed endpoint into state.
+    Fetch {
+        url: String,
+        bind_to: String,
     },
     CallFunction {
         function: String,
@@ -507,6 +524,26 @@ impl UiElement {
                 }
             }
             UiElement::Divider => {}
+            UiElement::Chart {
+                title,
+                collection,
+                amount_field,
+                chart_type,
+            } => {
+                if title.is_empty()
+                    || title.len() > 120
+                    || collection.len() > 50
+                    || amount_field.len() > 50
+                    || chart_type.len() > 20
+                {
+                    return Err("Chart declaration is invalid".to_string());
+                }
+            }
+            UiElement::AudioPlayer { label, source } => {
+                if label.is_empty() || label.len() > 120 || source.len() > 500 {
+                    return Err("Audio player declaration is invalid".to_string());
+                }
+            }
         }
 
         Ok(())
@@ -567,6 +604,11 @@ impl Action {
             Action::NotifyUser { message } => {
                 if message.is_empty() || message.len() > 500 {
                     return Err("Notification message invalid".to_string());
+                }
+            }
+            Action::Fetch { url, bind_to } => {
+                if url.is_empty() || url.len() > 500 || bind_to.is_empty() || bind_to.len() > 50 {
+                    return Err("Fetch action is invalid".to_string());
                 }
             }
             Action::ScheduleReminder { message, time } => {

@@ -163,4 +163,32 @@ void main() {
     expect(state['month'], 'January');
     expect((state['transactions'] as List).single['label'], 'Salary');
   });
+
+  test('SproutPreviewDocument parses charts, audio players, and fetch actions', () {
+    const source = r'''
+      app "Media & Insights App" {
+        start = Home
+      }
+      screen Home {
+        ui {
+          chart "Spending Chart" transactions amount by bar
+          audio "Voice Note" -> voiceNote
+          button "Fetch Data" {
+            fetch "https://api.example.com/rates" -> apiResult
+          }
+        }
+      }
+    ''';
+    final doc = SproutPreviewDocument.parse(source);
+    expect(doc.appName, 'Media & Insights App');
+    expect(doc.currentScreen.elements.length, 3);
+    expect(doc.currentScreen.elements[0], isA<SproutPreviewChart>());
+    expect(doc.currentScreen.elements[1], isA<SproutPreviewAudioPlayer>());
+    expect(doc.currentScreen.elements[2], isA<SproutPreviewButton>());
+
+    final button = doc.currentScreen.elements[2] as SproutPreviewButton;
+    final effects = doc.activate(button);
+    expect(effects, isEmpty);
+    expect(doc.exportState()['apiResult'], 'Fetched data from https://api.example.com/rates');
+  });
 }

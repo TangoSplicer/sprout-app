@@ -288,7 +288,10 @@ class SproutPreviewDocument {
         _state[variable] = metricValue(variable) + by;
         return null;
       case SproutPreviewClear(:final variable):
-        _state[variable] = <String>[];
+        _state[variable] = const [];
+        return null;
+      case SproutPreviewFetch(:final url, :final bindTo):
+        _state[bindTo] = 'Fetched data from $url';
         return null;
       case SproutPreviewScheduleReminder(:final message, :final time):
         return SproutPreviewReminderRequest(
@@ -367,6 +370,8 @@ class SproutPreviewDocument {
     final section = RegExp(r'^section\s+"([^"]+)"(?:\s+"([^"]*)")?$');
     final metric = RegExp(r'^metric\s+"([^"]+)"\s*->\s*(\w+)$');
     final toggle = RegExp(r'^toggle\s+"([^"]+)"\s*->\s*(\w+)$');
+    final chart = RegExp(r'^chart\s+"([^"]+)"\s+(\w+)\s+(\w+)\s+by\s+(\w+)$');
+    final audio = RegExp(r'^audio\s+"([^"]+)"\s*->\s*(\w+)$');
     final button = RegExp(r'^button\s+"([^"]+)"\s*(.*)$');
     final legacyButton = RegExp(r'^button\("([^"]+)"\)$');
 
@@ -510,6 +515,24 @@ class SproutPreviewDocument {
             SproutPreviewToggle(toggleMatch.group(1)!, toggleMatch.group(2)!));
         continue;
       }
+      final chartMatch = chart.firstMatch(line);
+      if (chartMatch != null) {
+        elements.add(SproutPreviewChart(
+          title: chartMatch.group(1)!,
+          collection: chartMatch.group(2)!,
+          amountField: chartMatch.group(3)!,
+          chartType: chartMatch.group(4)!,
+        ));
+        continue;
+      }
+      final audioMatch = audio.firstMatch(line);
+      if (audioMatch != null) {
+        elements.add(SproutPreviewAudioPlayer(
+          label: audioMatch.group(1)!,
+          source: audioMatch.group(2)!,
+        ));
+        continue;
+      }
       if (line == 'divider') {
         elements.add(const SproutPreviewDivider());
         continue;
@@ -560,6 +583,7 @@ class SproutPreviewDocument {
     final reminder = RegExp(r'^reminder\s+(.+?)\s+at\s+(.+)$');
     final increment = RegExp(r'^increment\s+(\w+)(?:\s+by\s+(-?\d+))?$');
     final clear = RegExp(r'^clear\s+(\w+)$');
+    final fetch = RegExp(r'^fetch\s+"([^"]+)"\s*->\s*(\w+)$');
     final assignment = RegExp(r'^(\w+)\s*=\s*(.+)$');
     final navigate = RegExp(r'^(?:go|navigate)\s+(\w+)$');
 
@@ -609,6 +633,9 @@ class SproutPreviewDocument {
         ));
       } else if (clearMatch != null) {
         actions.add(SproutPreviewClear(clearMatch.group(1)!));
+      } else if (fetch.firstMatch(value) != null) {
+        final match = fetch.firstMatch(value)!;
+        actions.add(SproutPreviewFetch(match.group(1)!, match.group(2)!));
       } else if (navigateMatch != null) {
         actions.add(SproutPreviewNavigate(navigateMatch.group(1)!));
       } else if (assignmentMatch != null) {
@@ -820,6 +847,30 @@ class SproutPreviewToggle extends SproutPreviewElement {
   const SproutPreviewToggle(this.label, this.binding);
 }
 
+class SproutPreviewChart extends SproutPreviewElement {
+  final String title;
+  final String collection;
+  final String amountField;
+  final String chartType;
+
+  const SproutPreviewChart({
+    required this.title,
+    required this.collection,
+    required this.amountField,
+    required this.chartType,
+  });
+}
+
+class SproutPreviewAudioPlayer extends SproutPreviewElement {
+  final String label;
+  final String source;
+
+  const SproutPreviewAudioPlayer({
+    required this.label,
+    required this.source,
+  });
+}
+
 class SproutPreviewDivider extends SproutPreviewElement {
   const SproutPreviewDivider();
 }
@@ -893,6 +944,13 @@ class SproutPreviewClear extends SproutPreviewAction {
   final String variable;
 
   const SproutPreviewClear(this.variable);
+}
+
+class SproutPreviewFetch extends SproutPreviewAction {
+  final String url;
+  final String bindTo;
+
+  const SproutPreviewFetch(this.url, this.bindTo);
 }
 
 sealed class SproutPreviewEffect {

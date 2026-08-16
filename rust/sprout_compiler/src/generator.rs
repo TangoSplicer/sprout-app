@@ -297,6 +297,15 @@ impl CodeGenerator {
                     indent = indent * 4
                 ));
             }
+            Action::Fetch { url, bind_to } => {
+                code.push_str(&format!(
+                    "{:indent$};; Fetch {} -> {}\n",
+                    "",
+                    url,
+                    bind_to,
+                    indent = indent * 4
+                ));
+            }
             Action::CallFunction { function, args } => {
                 // Security: Validate function call
                 if function.contains("eval") || function.contains("exec") {

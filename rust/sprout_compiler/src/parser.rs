@@ -466,6 +466,7 @@ impl Parser {
         let navigation_regex = Regex::new(r"^(?:go|navigate)\s+(\w+)$").expect("static regex");
         let sync_regex = Regex::new(r"^sync\s+(\w+)$").expect("static regex");
         let notify_regex = Regex::new(r#"^notify\s+"([^"]+)"$"#).expect("static regex");
+        let fetch_regex = Regex::new(r#"^fetch\s+"([^"]+)"\s*->\s*(\w+)$"#).expect("static regex");
 
         let mut actions = Vec::new();
         for statement in source.split(['\n', ';']) {
@@ -584,6 +585,15 @@ impl Parser {
                     message: capture
                         .get(1)
                         .expect("message capture")
+                        .as_str()
+                        .to_string(),
+                });
+            } else if let Some(capture) = fetch_regex.captures(statement) {
+                actions.push(Action::Fetch {
+                    url: capture.get(1).expect("url capture").as_str().to_string(),
+                    bind_to: capture
+                        .get(2)
+                        .expect("binding capture")
                         .as_str()
                         .to_string(),
                 });
