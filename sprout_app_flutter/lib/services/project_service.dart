@@ -508,11 +508,49 @@ class ProjectService {
           File('${backupDir.path}/${fileName}_$timestamp.backup');
       await backupFile.writeAsString(content);
 
-      // Keep only last 10 backups per file
+      // Keep only last 20 backups per file
       await _cleanupBackups(backupDir, fileName);
     } catch (e) {
       // Ignore backup failures
     }
+  }
+
+  Future<List<ProjectVersion>> listVersions(String projectName) async {
+    await _ensureInitialized();
+    final sanitized = _sanitizeName(projectName);
+    final backupDir = Directory('${_backupsDir.path}/$sanitized');
+    if (!await backupDir.exists()) return [];
+
+    final versions = <ProjectVersion>[];
+    await for (final entity in backupDir.list()) {
+      if (entity is File && entity.path.endsWith('.backup')) {
+        final name = entity.path.split('/').last;
+        final parts = name.split('_');
+        if (parts.length >= 2) {
+          final tsStr = parts.last.replaceAll('.backup', '');
+          final timestamp = int.tryParse(tsStr) ?? 0;
+          versions.add(ProjectVersion(
+            timestamp: timestamp,
+            date: DateTime.fromMillisecondsSinceEpoch(timestamp),
+            filePath: entity.path,
+          ));
+        }
+      }
+    }
+    versions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return versions;
+  }
+
+  Future<void> restoreVersion(String projectName, int timestamp) async {
+    await _ensureInitialized();
+    final sanitized = _sanitizeName(projectName);
+    final backupDir = Directory('${_backupsDir.path}/$sanitized');
+    final backupFile = File('${backupDir.path}/main.sprout_$timestamp.backup');
+    if (!await backupFile.exists()) {
+      throw ProjectException('Version not found');
+    }
+    final content = await backupFile.readAsString();
+    await writeFile(projectName, 'main.sprout', content);
   }
 
   Future<void> _cleanupBackups(Directory backupDir, String fileName) async {
@@ -524,11 +562,11 @@ class ProjectService {
           .cast<File>()
           .toList();
 
-      if (backups.length > 10) {
+      if (backups.length > 20) {
         backups.sort(
             (a, b) => a.statSync().changed.compareTo(b.statSync().changed));
 
-        for (int i = 0; i < backups.length - 10; i++) {
+        for (int i = 0; i < backups.length - 20; i++) {
           await backups[i].delete();
         }
       }
@@ -755,4 +793,16 @@ class SecurityException implements Exception {
 
   @override
   String toString() => 'SecurityException: $message';
+}
+
+class ProjectVersion {
+  final int timestamp;
+  final DateTime date;
+  final String filePath;
+
+  const ProjectVersion({
+    required this.timestamp,
+    required this.date,
+    required this.filePath,
+  });
 }

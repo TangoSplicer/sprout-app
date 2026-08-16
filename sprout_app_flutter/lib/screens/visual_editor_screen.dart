@@ -1,0 +1,333 @@
+import 'package:flutter/material.dart';
+
+import '../theme/sprout_theme.dart';
+
+class VisualEditorScreen extends StatefulWidget {
+  final String projectName;
+  final String initialSource;
+
+  const VisualEditorScreen({
+    super.key,
+    required this.projectName,
+    required this.initialSource,
+  });
+
+  @override
+  State<VisualEditorScreen> createState() => _VisualEditorScreenState();
+}
+
+class _VisualEditorScreenState extends State<VisualEditorScreen> {
+  late String _appName;
+  final List<_VisualComponent> _components = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _parseSource(widget.initialSource);
+  }
+
+  void _parseSource(String source) {
+    // Extract app name
+    final appMatch = RegExp(r'app\s+"([^"]+)"').firstMatch(source);
+    _appName = appMatch?.group(1) ?? widget.projectName;
+
+    // Simple heuristic parser for existing elements to populate visual builder
+    _components.clear();
+    for (final line in source.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.startsWith('label ')) {
+        final val = trimmed.substring(6).replaceAll('"', '').trim();
+        _components.add(_VisualComponent(type: _ComponentType.label, label: val));
+      } else if (trimmed.startsWith('input ')) {
+        final match = RegExp(r'input\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)').firstMatch(trimmed);
+        if (match != null) {
+          _components.add(_VisualComponent(
+            type: _ComponentType.input,
+            label: match.group(1) ?? '',
+            binding: match.group(2) ?? 'textInput',
+          ));
+        }
+      } else if (trimmed.startsWith('number ')) {
+        final match = RegExp(r'number\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)').firstMatch(trimmed);
+        if (match != null) {
+          _components.add(_VisualComponent(
+            type: _ComponentType.number,
+            label: match.group(1) ?? '',
+            binding: match.group(2) ?? 'numVal',
+          ));
+        }
+      } else if (trimmed.startsWith('metric ')) {
+        final match = RegExp(r'metric\s+"([^"]+)"\s*->\s*([A-Za-z0-9_]+)').firstMatch(trimmed);
+        if (match != null) {
+          _components.add(_VisualComponent(
+            type: _ComponentType.metric,
+            label: match.group(1) ?? '',
+            binding: match.group(2) ?? 'metricVal',
+          ));
+        }
+      } else if (trimmed.startsWith('list ')) {
+        final binding = trimmed.substring(5).trim();
+        _components.add(_VisualComponent(
+          type: _ComponentType.list,
+          label: 'List: $binding',
+          binding: binding,
+        ));
+      } else if (trimmed.startsWith('button ')) {
+        final match = RegExp(r'button\s+"([^"]+)"').firstMatch(trimmed);
+        if (match != null) {
+          _components.add(_VisualComponent(
+            type: _ComponentType.button,
+            label: match.group(1) ?? 'Action',
+          ));
+        }
+      }
+    }
+
+    if (_components.isEmpty) {
+      _components.addAll([
+        const _VisualComponent(type: _ComponentType.label, label: 'Welcome to your app!'),
+        const _VisualComponent(type: _ComponentType.input, label: 'Type something', binding: 'userText'),
+        const _VisualComponent(type: _ComponentType.button, label: 'Save note'),
+      ]);
+    }
+  }
+
+  String _generateSource() {
+    final buffer = StringBuffer();
+    buffer.writeln('app "$_appName" {');
+    buffer.writeln('  start = "Home"');
+    buffer.writeln('}');
+    buffer.writeln('');
+    buffer.writeln('screen Home {');
+    // Collect state bindings
+    final bindings = _components.where((c) => c.binding.isNotEmpty).map((c) => c.binding).toSet();
+    for (final b in bindings) {
+      buffer.writeln('  state $b = ""');
+    }
+    buffer.writeln('  ui {');
+    buffer.writeln('    column {');
+    buffer.writeln('      title "Visual Builder App"');
+
+    for (final c in _components) {
+      switch (c.type) {
+        case _ComponentType.label:
+          buffer.writeln('      label "${c.label}"');
+          break;
+        case _ComponentType.input:
+          buffer.writeln('      input "${c.label}" -> ${c.binding}');
+          break;
+        case _ComponentType.number:
+          buffer.writeln('      number "${c.label}" -> ${c.binding}');
+          break;
+        case _ComponentType.metric:
+          buffer.writeln('      metric "${c.label}" -> ${c.binding}');
+          break;
+        case _ComponentType.list:
+          buffer.writeln('      list ${c.binding}');
+          break;
+        case _ComponentType.button:
+          buffer.writeln('      button "${c.label}" {');
+          if (c.binding.isNotEmpty) {
+            buffer.writeln('        ${c.binding}.append("Updated")');
+          } else {
+            buffer.writeln('        // Action');
+          }
+          buffer.writeln('      }');
+          break;
+      }
+    }
+
+    buffer.writeln('    }');
+    buffer.writeln('  }');
+    buffer.writeln('}');
+    return buffer.toString();
+  }
+
+  void _addComponent(_ComponentType type) {
+    setState(() {
+      switch (type) {
+        case _ComponentType.label:
+          _components.add(const _VisualComponent(type: _ComponentType.label, label: 'New label text'));
+          break;
+        case _ComponentType.input:
+          _components.add(const _VisualComponent(type: _ComponentType.input, label: 'New field', binding: 'fieldInput'));
+          break;
+        case _ComponentType.number:
+          _components.add(const _VisualComponent(type: _ComponentType.number, label: 'Amount', binding: 'amountVal'));
+          break;
+        case _ComponentType.metric:
+          _components.add(const _VisualComponent(type: _ComponentType.metric, label: 'Total', binding: 'totalVal'));
+          break;
+        case _ComponentType.list:
+          _components.add(const _VisualComponent(type: _ComponentType.list, label: 'Items', binding: 'itemsList'));
+          break;
+        case _ComponentType.button:
+          _components.add(const _VisualComponent(type: _ComponentType.button, label: 'Perform Action'));
+          break;
+      }
+    });
+  }
+
+  void _removeItem(int index) {
+    setState(() => _components.removeAt(index));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Visual Component Builder'),
+        actions: [
+          FilledButton.icon(
+            onPressed: () {
+              final code = _generateSource();
+              Navigator.pop(context, code);
+            },
+            icon: const Icon(Icons.check),
+            label: const Text('Apply to code'),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: SproutTheme.peach,
+              child: const Row(
+                children: [
+                  Icon(Icons.widgets_outlined, color: SproutTheme.forest),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Build your app visually by adding components below. Sprout generates clean, secure code automatically.',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ReorderableListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _components.length,
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) newIndex--;
+                    final item = _components.removeAt(oldIndex);
+                    _components.insert(newIndex, item);
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final item = _components[index];
+                  return Card(
+                    key: ValueKey(item),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: ListTile(
+                      leading: Icon(_iconForType(item.type), color: SproutTheme.forest),
+                      title: Text(item.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text('${item.type.name.toUpperCase()}${item.binding.isNotEmpty ? ' • ${item.binding}' : ''}'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        onPressed: () => _removeItem(index),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    const Text('Add component:', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 12),
+                    ActionChip(
+                      avatar: const Icon(Icons.text_fields, size: 16),
+                      label: const Text('Label'),
+                      onPressed: () => _addComponent(_ComponentType.label),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.input, size: 16),
+                      label: const Text('Input'),
+                      onPressed: () => _addComponent(_ComponentType.input),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.pin, size: 16),
+                      label: const Text('Number'),
+                      onPressed: () => _addComponent(_ComponentType.number),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.analytics_outlined, size: 16),
+                      label: const Text('Metric'),
+                      onPressed: () => _addComponent(_ComponentType.metric),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.list_alt, size: 16),
+                      label: const Text('List'),
+                      onPressed: () => _addComponent(_ComponentType.list),
+                    ),
+                    const SizedBox(width: 8),
+                    ActionChip(
+                      avatar: const Icon(Icons.smart_button, size: 16),
+                      label: const Text('Button'),
+                      onPressed: () => _addComponent(_ComponentType.button),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _iconForType(_ComponentType type) {
+    switch (type) {
+      case _ComponentType.label:
+        return Icons.text_fields;
+      case _ComponentType.input:
+        return Icons.input;
+      case _ComponentType.number:
+        return Icons.pin;
+      case _ComponentType.metric:
+        return Icons.analytics_outlined;
+      case _ComponentType.list:
+        return Icons.list_alt;
+      case _ComponentType.button:
+        return Icons.smart_button;
+    }
+  }
+}
+
+enum _ComponentType { label, input, number, metric, list, button }
+
+class _VisualComponent {
+  final _ComponentType type;
+  final String label;
+  final String binding;
+
+  const _VisualComponent({
+    required this.type,
+    required this.label,
+    this.binding = '',
+  });
+}

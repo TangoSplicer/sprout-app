@@ -6,6 +6,7 @@ import '../services/native_bridge.dart';
 import '../services/project_service.dart';
 import '../theme/sprout_theme.dart';
 import 'editor_screen.dart';
+import 'gallery_screen.dart';
 import 'import_app_screen.dart';
 import 'learning_screen.dart';
 import 'preview_screen.dart';
@@ -257,6 +258,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         onPressed: () => _openImport(),
                         icon: const Icon(Icons.move_to_inbox_outlined),
                         label: const Text('Add a shared app'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const GalleryScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.storefront_outlined),
+                        label: const Text('Explore gallery'),
                       ),
                       TextButton.icon(
                         onPressed: () => Navigator.push(

@@ -120,6 +120,28 @@ void main() {
     });
   });
 
+  test('project service maintains version history backups and supports restore points',
+      () async {
+    final root = await Directory.systemTemp.createTemp('sprout_version_test_');
+    final service = ProjectService();
+    await service.useStorageDirectoryForTesting(root);
+    addTearDown(() async {
+      service.resetStorageDirectoryForTesting();
+      await root.delete(recursive: true);
+    });
+
+    await service.createProject('Versioned app');
+    await service.writeFile('Versioned app', 'main.sprout', 'app "Versioned app" { start = "V1" }');
+    await service.writeFile('Versioned app', 'main.sprout', 'app "Versioned app" { start = "V2" }');
+
+    final versions = await service.listVersions('Versioned app');
+    expect(versions, isNotEmpty);
+
+    await service.restoreVersion('Versioned app', versions.first.timestamp);
+    final restoredSource = await service.readFile('Versioned app', 'main.sprout');
+    expect(restoredSource, contains('V1'));
+  });
+
   test('project service preserves a JSON-safe app-state snapshot', () async {
     final root = await Directory.systemTemp.createTemp('sprout_state_test_');
     final service = ProjectService();

@@ -9,6 +9,8 @@ import '../widgets/syntax_editor.dart';
 import 'language_tools_screen.dart';
 import 'preview_screen.dart';
 import 'share_screen.dart';
+import 'version_history_screen.dart';
+import 'visual_editor_screen.dart';
 
 class EditorScreen extends StatefulWidget {
   final String projectName;
@@ -145,6 +147,50 @@ class _EditorScreenState extends State<EditorScreen> {
             icon: const Icon(Icons.add_to_home_screen_outlined),
             tooltip: 'Add this app to your home screen',
             onPressed: _addToHomeScreen,
+          ),
+          IconButton(
+            icon: const Icon(Icons.widgets_outlined),
+            tooltip: 'Visual builder',
+            onPressed: () async {
+              final controller = _controller;
+              if (controller == null) return;
+              final newCode = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VisualEditorScreen(
+                    projectName: widget.projectName,
+                    initialSource: controller.text,
+                  ),
+                ),
+              );
+              if (newCode != null && mounted) {
+                controller.text = newCode;
+                await _save(announce: false);
+                setState(() {});
+                _showMessage('Visual changes applied to app source.');
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'Version history',
+            onPressed: () async {
+              final restored = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VersionHistoryScreen(projectName: widget.projectName),
+                ),
+              );
+              if (restored == true && mounted) {
+                _codeFuture = ProjectService().readFile(widget.projectName, 'main.sprout');
+                final content = await _codeFuture;
+                if (!mounted) return;
+                setState(() {
+                  _controller = TextEditingController(text: content);
+                });
+                _showMessage('Restored project version.');
+              }
+            },
           ),
           IconButton(
             icon: const Icon(Icons.share_outlined),
