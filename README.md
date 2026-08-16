@@ -1,77 +1,63 @@
-# Sprout
+# Sprout: Grow apps that grow with you.
 
-**Grow apps that grow with you.**
+Sprout is an extensible, privacy-first mobile application platform for turning personal needs into robust local tools. By combining a high-performance **Rust-backed logic engine** with a fluid **Flutter Material 3 interface**, Sprout allows users to build, share, and install multi-screen applications directly on their devices.
 
-Sprout is an Android-focused mobile app for turning a small personal need into a simple local tool. A user can begin from a template or an AI-generated SproutScript starter, review the resulting source, save it to a project, compile it locally with the Rust compiler, and preview the supported interface.
+## Core Capabilities
 
-> Sprout is designed to start with an idea rather than a framework. The user remains in control of the generated source and every saved change.
+| Feature | Description |
+| :--- | :--- |
+| **Logic Power** | Advanced SproutScript support for `if/else` logic, `for-in` loops, and structured `data` models. |
+| **Native Lens** | Real-time photo capture via CameraX and high-speed QR/barcode scanning via Google ML Kit. |
+| **Sprout Connect** | Secure, P2P data synchronization for collaborative apps without a central server. |
+| **Encrypted Cloud** | Zero-knowledge, passphrase-protected local backups (`.sproutcloud`) for total data ownership. |
+| **Visual Builder** | A no-code layer over the source code, including a **Theme Studio** for instant visual customization. |
+| **Portable Sharing** | Share complete apps via `.sproutapp` bundles or high-density QR codes with full integrity verification. |
 
-## What works today
+## Quick Start for Contributors
 
-| Capability | Description |
-| --- | --- |
-| Guided starts | Ranked Todo, Counter, Quick Notes, and Habit Check-in templates are available from **New App**. |
-| AI starters | Ask for a todo list, counter, navigation app, or a general starter. **Use** replaces and saves the current project source. |
-| Local compilation | The Rust compiler is built into Android APKs for arm64-v8a, armeabi-v7a, and x86_64. |
-| Faithful preview | The preview renders the app name, first screen, labels, and buttons declared in the current SproutScript document. It reports compilation failures instead of opening a canned sample. |
-| Learning | The in-app **Learn Sprout** route and onboarding explain the idea → source → preview workflow without assuming coding experience. |
+### Environment Setup
 
-## Quick start for contributors
-
-### Prerequisites
-
-Install Flutter 3.24.0, a Java 17 JDK, Rust stable, Android NDK r26d, and `cargo-ndk`. Install the Android Rust targets once:
+To build Sprout from source, you will need Flutter 3.24.0, a Java 17 JDK, Rust stable, and the Android NDK (r26d).
 
 ```bash
+# Install Android Rust targets
 rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 cargo install cargo-ndk --locked
-```
 
-Set `ANDROID_NDK_HOME` (or `ANDROID_NDK_ROOT`) to the installed NDK directory. The Android Gradle `preBuild` task runs `scripts/build_android_native.sh` automatically, so an APK build packages the Rust compiler libraries before it assembles.
-
-```bash
-export PATH="/path/to/flutter/bin:$PATH"
-export JAVA_HOME=/path/to/java-17
-export ANDROID_SDK_ROOT=/path/to/android-sdk
-export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/26.3.11579264"
-
+# Build the Rust compiler and Flutter application
+bash scripts/build_android_native.sh
 cd sprout_app_flutter
 flutter pub get
-flutter analyze --no-fatal-infos
-flutter test test
 flutter build apk --debug
 ```
 
-The test APK is written to `sprout_app_flutter/build/app/outputs/flutter-apk/app-debug.apk`.
+### Quality Assurance
 
-## Quality checks
-
-Run the Rust and Flutter checks before opening a pull request:
+We maintain strict quality gates for both the Rust compiler and the Flutter frontend. All pull requests must pass the following checks:
 
 ```bash
-source "$HOME/.cargo/env"
+# Rust Quality Gates
 cargo fmt --all --check
-cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
+cargo audit
 
-cd sprout_app_flutter
+# Flutter Quality Gates
 flutter analyze --no-fatal-infos
 flutter test test
 ```
 
-## Project direction
+## Documentation & Architecture
 
-Sprout is currently focused on reliable personal tools and an understandable local-first workflow. Its longer-term direction includes shareable project bundles, a personal app garden, desktop/web authoring, and voice-assisted creation. See [the roadmap](docs/ROADMAP.md) for current scope, proposed milestones, and product principles.
+For a deep dive into the system design and implementation details, please refer to the following resources:
 
-## Repository layout
+- **[Implementation Summary](IMPLEMENTATION_SUMMARY.md)**: A detailed report on the Phase 2 architectural overhaul and security hardening.
+- **[Product Roadmap](ROADMAP.md)**: Our vision for the future, from custom themes to cross-platform support.
+- **[Language Specification](docs/language_spec.md)**: The formal grammar and primitives of SproutScript.
+- **[Sync Protocol](docs/sync_protocol.md)**: Technical details of the Sprout Connect P2P synchronization.
 
-| Path | Purpose |
-| --- | --- |
-| `rust/sprout_compiler` | Rust parser, compiler, validation surface, and mobile C ABI. |
-| `sprout_app_flutter` | Flutter Android application, app routes, templates, learning flow, and tests. |
-| `scripts/build_android_native.sh` | Cross-compiles and copies the Rust shared libraries into Android JNI resources. |
-| `docs/ROADMAP.md` | Product scope, future directions, and readiness milestones. |
+## Security Model
 
-## Security model
+Sprout operates on a **zero-trust, local-first** principle. Source code is validated by the Rust compiler before execution, and all user data is stored in encrypted atomic JSON snapshots. We do not transmit project content or personal data to any external servers without explicit, per-action user consent.
 
-Sprout validates source before compilation and uses a local compiler bridge. Generated projects are explicit source files, not opaque executables. Do not add capabilities that execute arbitrary code, request a permission, or transmit project content without an explicit user-facing design and review.
+---
+*Sprout is an open-source project dedicated to empowering users through local-first computing.*
