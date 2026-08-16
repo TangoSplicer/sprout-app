@@ -494,6 +494,63 @@ screen Directory {
   }
 }''',
     ),
+    SproutLanguagePattern(
+      name: 'Shared grocery list',
+      description:
+          'Collaborate on a household list with P2P sync and native alerts when items are added.',
+      icon: Icons.shopping_basket_outlined,
+      color: Color(0xFF2C5D82),
+      source: '''app "{{appName}}" {
+  start = "List"
+}
+
+screen List {
+  state items: []
+  state newItem: ""
+  ui {
+    section "Household List" "Sync with others on your network to stay updated."
+    input "What do we need?" -> newItem
+    button "Add to list" {
+      items.append(newItem)
+      notify "New item added: \${newItem}"
+      newItem = ""
+    }
+    list items
+    button "Sync with peers" { sync items }
+    button "Clear list" { clear items }
+  }
+}''',
+    ),
+    SproutLanguagePattern(
+      name: 'Smart weather hub',
+      description:
+          'Fetch live weather data from a public API and visualize temperature trends with interactive charts.',
+      icon: Icons.wb_sunny_outlined,
+      color: Color(0xFF147A4A),
+      source: '''app "{{appName}}" {
+  start = "Weather"
+}
+
+screen Weather {
+  state city: "London"
+  state weatherData: "No data"
+  state history: []
+  ui {
+    section "Weather Insights" "Fetch live data and track local trends."
+    input "Enter city" -> city
+    button "Fetch current weather" {
+      fetch "https://api.example.com/weather/\${city}" -> weatherData
+      notify "Weather updated for \${city}"
+    }
+    label "Current: \${weatherData}"
+    chart "Temperature Trend" history value by bar
+    button "Add to history" {
+      history.add(label: city, value: 20)
+    }
+    audio "Local Forecast" -> "https://example.com/audio/forecast.mp3"
+  }
+}''',
+    ),
   ];
 
   static const snippets = <SproutLanguageSnippet>[

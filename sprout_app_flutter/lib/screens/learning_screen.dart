@@ -81,6 +81,40 @@ class LearningScreen extends StatelessWidget {
             body:
                 'Share a complete editable app package with another Sprout user, or add a named home-screen icon that opens your app in Sprout.',
           ),
+          const SizedBox(height: 24),
+          Text('Advanced Capabilities',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  )),
+          const SizedBox(height: 12),
+          const _LessonCard(
+            number: '6',
+            icon: Icons.sync_alt_outlined,
+            title: 'Sprout Connect (P2P Sync)',
+            body:
+                'Collaborate securely by syncing data between people sharing the same app over your local network with explicit consent.',
+          ),
+          const _LessonCard(
+            number: '7',
+            icon: Icons.notifications_active_outlined,
+            title: 'Native Notifications',
+            body:
+                'Keep users informed with immediate device alerts and reminders triggered by app actions.',
+          ),
+          const _LessonCard(
+            number: '8',
+            icon: Icons.bar_chart_rounded,
+            title: 'Visual Insights & Media',
+            body:
+                'Add interactive charts to visualize trends and audio players for voice notes or soundscapes directly in your app.',
+          ),
+          const _LessonCard(
+            number: '9',
+            icon: Icons.public_outlined,
+            title: 'Safe Web Connectivity',
+            body:
+                'Fetch live data from public APIs into your app state while maintaining a strict local-first security model.',
+          ),
           const SizedBox(height: 12),
           Text(
             'Tip: begin with a pattern that already works, then make one useful change at a time. You remain in control of every screen, record, and shared package.',

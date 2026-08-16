@@ -122,6 +122,28 @@ class SproutCodeAssistant {
         amendment: SproutAmendment.addReflection,
       ));
     }
+    if (source.contains('records ') && !source.contains('chart ')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'No visual data insights',
+        detail: 'A chart primitive can visualize trends in your records instantly.',
+      ));
+    }
+    if (source.contains('.add(') && !source.contains('notify ')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'No user notification',
+        detail: 'A notify action keeps the user informed when new data is added.',
+      ));
+    }
+    if (source.contains('records ') && !source.contains('sync ')) {
+      findings.add(const SproutReviewFinding(
+        severity: SproutReviewSeverity.hint,
+        title: 'App data is not collaborative',
+        detail: 'Use a sync action to share and merge records with peers on your network.',
+      ));
+    }
+
     if (findings.isEmpty) {
       findings.add(const SproutReviewFinding(
         severity: SproutReviewSeverity.good,
